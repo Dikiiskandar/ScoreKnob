@@ -10,10 +10,12 @@ const RADIUS = 150;
 const CENTER = RADIUS + 50;
 
 const initialPlayers: Player[] = [
-  { id: 1, name: "Alice", score: 0 },
-  { id: 2, name: "Bob", score: 0 },
-  { id: 3, name: "Charlie", score: 0 },
-  { id: 4, name: "Diana", score: 0 },
+  { id: 1, name: "Satu", score: 0,  },
+  { id: 2, name: "Dua", score: 0 },
+  { id: 3, name: "Tiga", score: 0 },
+  { id: 4, name: "Empat", score: 0 },
+  { id: 5, name: "Lima", score: 0 },
+  { id: 6, name: "Enam", score: 0 },
 ];
 
 const KnobScoreboard: React.FC = () => {
@@ -38,8 +40,8 @@ const KnobScoreboard: React.FC = () => {
       angleDifference < -Math.PI
         ? angleDifference + 2 * Math.PI
         : angleDifference > Math.PI
-        ? angleDifference - 2 * Math.PI
-        : angleDifference;
+          ? angleDifference - 2 * Math.PI
+          : angleDifference;
 
     const updatedTotalRotation = totalRotationRef.current + angleDifference;
     const deltaScore = Math.round(angleDifference * 10); // adjust multiplier as needed
@@ -105,35 +107,60 @@ const KnobScoreboard: React.FC = () => {
   }, [activePlayerId]);
 
   return (
-    <div className="flex justify-center items-center h-screen bg-gray-100">
-      <div
-        ref={containerRef}
-        className="relative w-[400px] h-[400px] bg-white rounded-full border shadow touch-none"
-      >
-        {players.map((player, index) => {
-          const angle = (index / players.length) * 2 * Math.PI;
-          const x = CENTER + RADIUS * Math.cos(angle) - 40;
-          const y = CENTER + RADIUS * Math.sin(angle) - 20;
-
-          return (
-            <div
-              key={player.id}
-              className="absolute w-[80px] text-center cursor-pointer select-none"
-              style={{ left: `${x}px`, top: `${y}px` }}
-              onMouseDown={(e) => handleStart(e, player.id)}
-              onTouchStart={(e) => handleStart(e, player.id)}
-            >
-              <div className="font-semibold text-gray-700">{player.name}</div>
-              <div className="text-blue-600 text-xl">{player.score}</div>
+    <div className="flex flex-col justify-center items-center h-screen bg-gray-100">
+      <div className="w-full h-[50px] bg-blue-500 text-white flex items-center justify-between gap-4 px-4">
+        <div className="font-bold">{activePlayerId ? players.find((p) => p.id === activePlayerId)?.name : 'ScoreKnob'}</div>
+        {
+          activePlayerId && (
+            <div className="flex items-center gap-4">
+              <div className="flex items-center">
+                <div>5</div>
+                <div>- 100</div>
+              </div>
+              <div>=</div>
+              <div>100</div>
             </div>
-          );
-        })}
+          )
+        }
+      </div>
+      <div className="flex-1 flex justify-center items-center">
         <div
-          className="absolute left-[50%] top-[50%] -translate-x-1/2 -translate-y-1/2 w-[80px] h-[80px] bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg"
+          ref={containerRef}
+          className="relative w-[400px] h-[400px] rounded-full border border-4 touch-none"
         >
-          Knob
+          {players.map((player, index) => {
+            const angle = (index / players.length) * 2 * Math.PI - Math.PI / 2;;
+            const degrees = (angle * 180) / Math.PI;
+
+            const LABEL_RADIUS = RADIUS + 60;
+            const x = CENTER + LABEL_RADIUS * Math.cos(angle);
+            const y = CENTER + LABEL_RADIUS * Math.sin(angle);
+
+            return (
+              <div
+                key={player.id}
+                className="absolute w-[80px] text-center cursor-pointer select-none bg-gray-100"
+                style={{
+                  left: `${x}px`,
+                  top: `${y}px`,
+                  transform: `translate(-50%, -50%) rotate(${degrees + 90}deg)`, // rotate toward center
+                }}
+                onMouseDown={(e) => handleStart(e, player.id)}
+                onTouchStart={(e) => handleStart(e, player.id)}
+              >
+                <div className="font-semibold text-gray-700">{player.name}</div>
+                <div className="text-blue-600 text-xl">{player.score}</div>
+              </div>
+            );
+          })}
+          <div
+            className="absolute left-[50%] top-[50%] -translate-x-1/2 -translate-y-1/2 w-[100px] h-[100px] bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg"
+          >
+            Submit
+          </div>
         </div>
       </div>
+      <div></div>
     </div>
   );
 };

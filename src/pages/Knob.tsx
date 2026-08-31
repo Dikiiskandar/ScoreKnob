@@ -62,7 +62,7 @@ const KnobScoreboard: React.FC = () => {
   const getAngle = (x: number, y: number): number => {
     const dx = x - CENTER;
     const dy = y - CENTER;
-    let angle = Math.atan2(dy, dx);
+    const angle = Math.atan2(dy, dx);
     return angle < 0 ? angle + 2 * Math.PI : angle; // Normalize to 0-2PI
   };
 

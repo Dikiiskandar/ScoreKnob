@@ -111,10 +111,25 @@
 }
 
 @layer base {
+  :root {
+    --safe-top: env(safe-area-inset-top, 0px);
+  }
   * {
     @apply border-border outline-ring/50;
   }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
   body {
     @apply bg-background text-foreground;
+    /* iOS standalone: stop rubber-band scrolling revealing the page behind */
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
   }
+}
+
+@utility pt-safe {
+  padding-top: var(--safe-top);
 }

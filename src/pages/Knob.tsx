@@ -245,8 +245,8 @@ const KnobScoreboard: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background">
-      <div className={`w-full h-[60px] flex items-center justify-between gap-4 px-4 shadow-md transition-all ${activePlayerId ? 'bg-gradient-to-r from-primary to-primary/90 text-primary-foreground' : 'bg-muted text-foreground'}`}>
+    <div className="flex flex-col h-[100dvh] overflow-hidden bg-background">
+      <div className={`w-full h-[calc(60px+var(--safe-top))] pt-safe flex items-center justify-between gap-4 px-4 shadow-md transition-all ${activePlayerId ? 'bg-gradient-to-r from-primary to-primary/90 text-primary-foreground' : 'bg-muted text-foreground'}`}>
         <div className="flex items-center gap-2">
           <div className="font-bold text-lg">{activePlayerId ? players.find((p) => p.id === activePlayerId)?.name : 'ScoreKnob'}</div>
           {isOffline && (
@@ -452,7 +452,7 @@ const KnobScoreboard: React.FC = () => {
 
       {/* Player Management Panel */}
       {showPlayerManager && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pt-[calc(1rem+var(--safe-top))]">
           <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
             <div className="p-6 border-b">
               <h2 className="text-xl font-bold">Manage Players</h2>
@@ -546,7 +546,7 @@ const KnobScoreboard: React.FC = () => {
 
       {/* Leaderboard Panel */}
       {showLeaderboard && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pt-[calc(1rem+var(--safe-top))]">
           <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
             <div className="p-6 border-b">
               <h2 className="text-xl font-bold flex items-center gap-2">
@@ -624,7 +624,7 @@ const KnobScoreboard: React.FC = () => {
       )}
       {/* Add to Home Screen (iOS) */}
       {showIosInstall && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pt-[calc(1rem+var(--safe-top))]">
           <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
             <h2 className="text-xl font-bold">Add to Home Screen</h2>
             <p className="text-sm text-muted-foreground">

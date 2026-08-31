@@ -11,7 +11,7 @@ function App() {
 
   return (
     <ThemeProvider>
-      <div className={`bg-background ${isKnobPage ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
+      <div className={`bg-background ${isKnobPage ? 'h-[100dvh] overflow-hidden' : 'min-h-[100dvh]'}`}>
         {!isKnobPage && <Navigation />}
         <main className={isKnobPage ? 'h-full' : ''}>
           <Routes>

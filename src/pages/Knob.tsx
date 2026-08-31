@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
-import { RotateCw, Plus, Trash2, Edit2, X, Trophy, Medal, MoreVertical } from "lucide-react";
+import { RotateCw, Plus, Trash2, Edit2, X, Trophy, Medal, MoreVertical, Download, WifiOff, Share } from "lucide-react";
+import { usePwaInstall } from "@/hooks/usePwaInstall";
 
 type Player = {
   id: number;
@@ -53,6 +54,19 @@ const KnobScoreboard: React.FC = () => {
   const [newPlayerName, setNewPlayerName] = useState<string>("");
   const [editingPlayerId, setEditingPlayerId] = useState<number | null>(null);
   const [editingPlayerName, setEditingPlayerName] = useState<string>("");
+  const [showIosInstall, setShowIosInstall] = useState<boolean>(false);
+
+  const { canInstall, needsIosInstructions, isInstalled, isOffline, promptInstall } = usePwaInstall();
+  const showInstallAction = !isInstalled && (canInstall || needsIosInstructions);
+
+  const handleInstall = () => {
+    setShowActionMenu(false);
+    if (canInstall) {
+      void promptInstall();
+      return;
+    }
+    setShowIosInstall(true);
+  };
 
   const containerRef = useRef<HTMLDivElement>(null);
   const previousAngleRef = useRef<number>(0);
@@ -233,7 +247,15 @@ const KnobScoreboard: React.FC = () => {
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
       <div className={`w-full h-[60px] flex items-center justify-between gap-4 px-4 shadow-md transition-all ${activePlayerId ? 'bg-gradient-to-r from-primary to-primary/90 text-primary-foreground' : 'bg-muted text-foreground'}`}>
-        <div className="font-bold text-lg">{activePlayerId ? players.find((p) => p.id === activePlayerId)?.name : 'ScoreKnob'}</div>
+        <div className="flex items-center gap-2">
+          <div className="font-bold text-lg">{activePlayerId ? players.find((p) => p.id === activePlayerId)?.name : 'ScoreKnob'}</div>
+          {isOffline && (
+            <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 text-xs font-semibold" title="You are offline. Scores are saved on this device.">
+              <WifiOff className="w-3 h-3" />
+              Offline
+            </span>
+          )}
+        </div>
         {
           activePlayerId && (() => {
             const activePlayer = players.find((p) => p.id === activePlayerId);
@@ -394,6 +416,15 @@ const KnobScoreboard: React.FC = () => {
         <div className="relative">
           {showActionMenu && (
             <div className="absolute right-0 bottom-16 flex flex-col gap-2">
+              {showInstallAction && (
+                <button
+                  onClick={handleInstall}
+                  className="w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center"
+                  title="Add to home screen"
+                >
+                  <Download className="w-6 h-6" />
+                </button>
+              )}
               <button
                 onClick={() => { setShowPlayerManager(true); setShowActionMenu(false); }}
                 className="w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center"
@@ -503,12 +534,6 @@ const KnobScoreboard: React.FC = () => {
 
             <div className="p-4 border-t space-y-2">
               <button
-                onClick={resetAllData}
-                className="w-full px-4 py-2 bg-red-500/20 text-red-600 rounded-md hover:bg-red-500/30 transition-colors"
-              >
-                Reset All Data
-              </button>
-              <button
                 onClick={() => setShowPlayerManager(false)}
                 className="w-full px-4 py-2 bg-muted text-foreground rounded-md hover:bg-accent transition-colors"
               >
@@ -597,6 +622,42 @@ const KnobScoreboard: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Add to Home Screen (iOS) */}
+      {showIosInstall && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <h2 className="text-xl font-bold">Add to Home Screen</h2>
+            <p className="text-sm text-muted-foreground">
+              Install ScoreKnob to play offline with a full-screen app icon.
+            </p>
+            <ol className="space-y-3 text-sm">
+              <li className="flex items-center gap-3">
+                <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center font-bold text-xs">1</span>
+                <span className="flex items-center gap-1">
+                  Tap the <Share className="w-4 h-4 inline" /> Share button in Safari
+                </span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center font-bold text-xs">2</span>
+                <span className="flex items-center gap-1">
+                  Choose <Plus className="w-4 h-4 inline" /> Add to Home Screen
+                </span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center font-bold text-xs">3</span>
+                <span>Tap Add to confirm</span>
+              </li>
+            </ol>
+            <button
+              onClick={() => setShowIosInstall(false)}
+              className="w-full px-4 py-2 bg-muted text-foreground rounded-md hover:bg-accent transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Round Switcher */}
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-2 bg-card/90 backdrop-blur-md rounded-full shadow-2xl max-w-[calc(100vw-170px)] overflow-x-auto z-40">
         {rounds.map((_, index) => (

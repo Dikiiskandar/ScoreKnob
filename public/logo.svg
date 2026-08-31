@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Diki Labs">
+  <rect width="512" height="512" rx="112.64" fill="#0b0b0c"/>
+  <g fill="#ffffff" fill-rule="evenodd">
+    <path d="M65.98 143.36 H156.09 A112.64 112.64 0 0 1 156.09 368.64 H65.98 Z M115.54 192.92 H156.09 A63.08 63.08 0 0 1 156.09 319.08 H115.54 Z"/>
+    <path d="M310.86 143.36 H360.42 V319.08 H446.02 V368.64 H310.86 Z"/>
+  </g>
+</svg>

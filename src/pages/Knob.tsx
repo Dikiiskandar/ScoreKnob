@@ -327,8 +327,7 @@ const KnobScoreboard: React.FC = () => {
                   onMouseDown={(e) => handleStart(e, player.id)}
                   onTouchStart={(e) => handleStart(e, player.id)}
                 >
-                  <div className="font-semibold text-sm flex items-center justify-center gap-1 whitespace-nowrap">
-                    {player.name}
+                  <div className="flex items-center justify-center gap-1 h-4">
                     {isFirstRank && <Trophy className="w-3 h-3 text-yellow-500" />}
                     {isLastRank && <span className="text-[10px] text-red-400 font-bold">LAST</span>}
                     {hasRanking && rankChange !== 0 && (
@@ -336,6 +335,9 @@ const KnobScoreboard: React.FC = () => {
                         {rankChange > 0 ? '↑' : '↓'}{Math.abs(rankChange)}
                       </span>
                     )}
+                  </div>
+                  <div className="font-semibold text-sm whitespace-nowrap">
+                    {player.name}
                   </div>
                   <div className="flex flex-col items-center">
                     <div className={`text-2xl font-bold ${activePlayerId === player.id ? 'text-primary-foreground' : 'text-primary'}`}>
@@ -388,7 +390,7 @@ const KnobScoreboard: React.FC = () => {
       )}
 
       {/* Action Button */}
-      <div className="fixed bottom-4 right-4 z-50" style={{ marginBottom: showLeaderboard ? '60px' : '0' }}>
+      <div className="fixed bottom-4 right-4 z-50">
         <div className="relative">
           {showActionMenu && (
             <div className="absolute right-0 bottom-16 flex flex-col gap-2">

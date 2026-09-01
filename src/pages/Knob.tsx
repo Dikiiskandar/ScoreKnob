@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import { RotateCw, Plus, Trash2, Edit2, X, Trophy, Medal, MoreVertical, Download, WifiOff, Share, Camera, Crown, TrendingDown, TrendingUp, ChevronsUpDown, ArrowDown, Image as ImageIcon, Mic, Square, Play, Volume2, Frown, Hand, Laugh, Smile } from "lucide-react";
+import { RotateCw, RotateCcw, Plus, Trash2, Edit2, X, Trophy, Medal, Download, WifiOff, Share, Camera, Crown, TrendingDown, TrendingUp, ChevronsUpDown, ArrowDown, Image as ImageIcon, Mic, Square, Play, Volume2, Frown, Hand, Laugh, Smile } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { useVoiceRecorder, canRecordVoice, recordUnavailableReason, MAX_VOICE_MS } from "@/hooks/useVoiceRecorder";
@@ -320,7 +320,6 @@ const KnobScoreboard: React.FC = () => {
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [multiplier, setMultiplier] = useState<number>(1);
   const [showPlayerManager, setShowPlayerManager] = useState<boolean>(false);
-  const [showActionMenu, setShowActionMenu] = useState<boolean>(false);
   const [showLeaderboard, setShowLeaderboard] = useState<boolean>(false);
   const [newPlayerName, setNewPlayerName] = useState<string>("");
   const [editingPlayerId, setEditingPlayerId] = useState<number | null>(null);
@@ -353,7 +352,6 @@ const KnobScoreboard: React.FC = () => {
   const showInstallAction = !isInstalled && (canInstall || needsIosInstructions);
 
   const handleInstall = () => {
-    setShowActionMenu(false);
     if (canInstall) {
       void promptInstall();
       return;
@@ -602,7 +600,11 @@ const KnobScoreboard: React.FC = () => {
     <div className="flex flex-col h-[100dvh] overflow-hidden bg-background">
       <div className={`w-full h-[calc(60px+var(--safe-top))] pt-safe flex items-center justify-between gap-4 px-4 shadow-md transition-all ${activePlayerId ? 'bg-gradient-to-r from-primary to-primary/90 text-primary-foreground' : 'bg-muted text-foreground'}`}>
         <div className="flex items-center gap-2">
-          <div className="font-bold text-lg">{activePlayerId ? players.find((p) => p.id === activePlayerId)?.name : 'ScoreKnob'}</div>
+          {activePlayerId ? (
+            <div className="font-bold text-lg">{players.find((p) => p.id === activePlayerId)?.name}</div>
+          ) : (
+            <img src="./logo.svg" className="w-6 h-6" alt="Diki Lab" />
+          )}
           {isOffline && (
             <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 text-xs font-semibold" title="You are offline. Scores are saved on this device.">
               <WifiOff className="w-3 h-3" />
@@ -626,17 +628,42 @@ const KnobScoreboard: React.FC = () => {
             );
           })()
         }
-        <button
-          onClick={() => {
-            const multipliers = [1, 5, 10, 25];
-            const currentIndex = multipliers.indexOf(multiplier);
-            const nextIndex = (currentIndex + 1) % multipliers.length;
-            setMultiplier(multipliers[nextIndex]);
-          }}
-          className="w-12 h-12 rounded-full bg-background/30 text-foreground border-2 border-foreground/40 flex items-center justify-center text-sm font-bold shadow-md active:scale-95 transition-all hover:bg-background/50"
-        >
-          {multiplier}x
-        </button>
+        <div className={`flex items-center gap-1 ${activePlayerId ? 'hidden' : ''}`}>
+          <button
+            onClick={() => {
+              const multipliers = [1, 5, 10, 25];
+              const currentIndex = multipliers.indexOf(multiplier);
+              const nextIndex = (currentIndex + 1) % multipliers.length;
+              setMultiplier(multipliers[nextIndex]);
+            }}
+            className="rounded-lg p-2 text-sm font-bold text-muted-foreground hover:bg-accent"
+          >
+            {multiplier}x
+          </button>
+          <button
+            onClick={() => setShowPlayerManager(true)}
+            aria-label="Add player"
+            className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
+          <button
+            onClick={resetAllData}
+            aria-label="Reset all"
+            className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
+          >
+            <RotateCcw className="w-5 h-5" />
+          </button>
+          {showInstallAction && (
+            <button
+              onClick={handleInstall}
+              aria-label="Install app"
+              className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
+            >
+              <Download className="w-5 h-5" />
+            </button>
+          )}
+        </div>
       </div>
       {/* Player Highlight */}
       {players.length > 0 && (() => {
@@ -809,52 +836,6 @@ const KnobScoreboard: React.FC = () => {
         </button>
       </div>
       
-      {showActionMenu && (
-        <div
-          onClick={() => setShowActionMenu(false)}
-          className="fixed inset-0 z-50 bg-black/70 cursor-pointer"
-        />
-      )}
-
-      {/* Action Button */}
-      <div className="fixed bottom-4 right-4 z-50">
-        <div className="relative">
-          {showActionMenu && (
-            <div className="absolute right-0 bottom-16 flex flex-col gap-2">
-              {showInstallAction && (
-                <button
-                  onClick={handleInstall}
-                  className="w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center"
-                  title="Add to home screen"
-                >
-                  <Download className="w-6 h-6" />
-                </button>
-              )}
-              <button
-                onClick={() => { setShowPlayerManager(true); setShowActionMenu(false); }}
-                className="w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center"
-                title="Add player"
-              >
-                <Plus className="w-6 h-6" />
-              </button>
-              <button
-                onClick={() => { resetAllData(); setShowActionMenu(false); }}
-                className="w-14 h-14 rounded-full bg-red-500 text-white shadow-lg hover:bg-red-600 transition-all flex items-center justify-center"
-                title="Reset all"
-              >
-                <Trash2 className="w-6 h-6" />
-              </button>
-            </div>
-          )}
-          <button
-            onClick={() => setShowActionMenu(!showActionMenu)}
-            className="relative z-10 w-14 h-14 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all flex items-center justify-center"
-          >
-            {showActionMenu ? <X className="w-6 h-6" /> : <MoreVertical className="w-6 h-6" />}
-          </button>
-        </div>
-      </div>
-
       {/* Player Management Panel */}
       {showPlayerManager && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pt-[calc(1rem+var(--safe-top))]">

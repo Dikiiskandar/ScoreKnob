@@ -201,7 +201,7 @@ const Versus: React.FC = () => {
   return (
     <div className="h-full flex flex-col">
       <div className="h-[calc(56px+var(--safe-top))] pt-safe flex items-center justify-between px-2 border-b bg-card">
-        <span className="px-3 text-sm font-semibold uppercase tracking-widest text-muted-foreground">Versus</span>
+        <img src="./logo.svg" className="w-6 h-6" alt="Diki Lab" />
         <div className="flex items-center gap-2 text-sm font-semibold tabular-nums">
           <span>{roundsWonBy("home", rounds)}</span>
           <span className="text-xs uppercase tracking-widest text-muted-foreground">rounds won</span>

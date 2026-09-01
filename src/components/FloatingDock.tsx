@@ -30,7 +30,7 @@ const loadPlacement = (storageKey: string): Placement => {
   } catch {
     // No usable placement stored yet.
   }
-  return { side: "left", y: 0.5 };
+  return { side: "right", y: 0.5 };
 };
 
 /**
@@ -130,7 +130,7 @@ const FloatingDock: React.FC<{
   return (
     <div
       ref={root}
-      className="fixed z-50"
+      className="fixed z-40"
       style={{
         left: position.x,
         top: position.y,

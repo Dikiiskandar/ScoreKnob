@@ -1,6 +1,10 @@
 import React, { useRef, useState, useEffect } from "react";
-import { RotateCw, Plus, Trash2, Edit2, X, Trophy, Medal, MoreVertical, Download, WifiOff, Share } from "lucide-react";
+import { RotateCw, Plus, Trash2, Edit2, X, Trophy, Medal, MoreVertical, Download, WifiOff, Share, Camera, Crown, TrendingDown, TrendingUp, ChevronsUpDown, ArrowDown, Image as ImageIcon, Mic, Square, Play, Volume2 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
+import { useVoiceRecorder, canRecordVoice, recordUnavailableReason, MAX_VOICE_MS } from "@/hooks/useVoiceRecorder";
+import { fileToSquareDataUrl } from "@/lib/image";
+import { fileToDataUrl } from "@/lib/file";
 
 type Player = {
   id: number;
@@ -9,12 +13,277 @@ type Player = {
   previousScore: number;
   previousRank: number;
   pendingScore: number;
+  photo?: string;
+  voice?: string;
 };
 
 const RADIUS = 120;
 const CENTER = RADIUS + 40;
+/** Voice clips live in localStorage, so keep imported sounds small. */
+const MAX_VOICE_BYTES = 200 * 1024;
 
 const initialPlayers: Player[] = [];
+
+/** Renders nothing when the player has no photo. */
+const PlayerAvatar: React.FC<{ player: Player; className?: string }> = ({ player, className = "" }) =>
+  player.photo ? (
+    <img src={player.photo} alt={player.name} className={`rounded-full object-cover ${className}`} />
+  ) : null;
+
+const MediaInput: React.FC<{
+  onFile: (file: File) => void;
+  accept?: string;
+  /** Ask the device for its camera/recorder instead of the file browser. */
+  capture?: boolean | "user" | "environment";
+  className?: string;
+  title?: string;
+  children: React.ReactNode;
+}> = ({ onFile, accept = "image/*", capture, className = "", title, children }) => (
+  <label className={`cursor-pointer ${className}`} title={title}>
+    <input
+      type="file"
+      accept={accept}
+      capture={capture}
+      className="hidden"
+      onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) onFile(file);
+        e.target.value = "";
+      }}
+    />
+    {children}
+  </label>
+);
+
+/** Lets the user pick a photo source: the camera or a file on the device. */
+const PhotoSourceSheet: React.FC<{
+  onFile: (file: File) => void;
+  onRemove?: () => void;
+  onClose: () => void;
+}> = ({ onFile, onRemove, onClose }) => (
+  <div
+    onClick={onClose}
+    className="fixed inset-0 z-[60] bg-black/50 flex items-end sm:items-center justify-center p-4 pb-[calc(1rem+var(--safe-bottom))]"
+  >
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="w-full max-w-sm bg-card rounded-2xl shadow-2xl overflow-hidden"
+    >
+      <div className="px-4 py-3 border-b font-semibold">Player photo</div>
+      <MediaInput
+        capture="environment"
+        onFile={(file) => { onClose(); onFile(file); }}
+        className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors"
+      >
+        <Camera className="w-5 h-5 text-primary" />
+        Take a photo
+      </MediaInput>
+      <MediaInput
+        onFile={(file) => { onClose(); onFile(file); }}
+        className="flex items-center gap-3 px-4 py-3 border-t hover:bg-accent transition-colors"
+      >
+        <ImageIcon className="w-5 h-5 text-primary" />
+        Choose from files
+      </MediaInput>
+      {onRemove && (
+        <button
+          onClick={() => { onClose(); onRemove(); }}
+          className="w-full flex items-center gap-3 px-4 py-3 border-t text-red-600 hover:bg-red-600/10 transition-colors"
+        >
+          <Trash2 className="w-5 h-5" />
+          Remove photo
+        </button>
+      )}
+      <button
+        onClick={onClose}
+        className="w-full px-4 py-3 border-t text-muted-foreground hover:bg-accent transition-colors"
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+);
+
+/** Record, preview or clear the clip that plays when a player gets highlighted. */
+const VoiceSheet: React.FC<{
+  player: Player;
+  isRecording: boolean;
+  isPlaying: boolean;
+  elapsedMs: number;
+  onStart: () => void;
+  onStop: () => void;
+  onPlay: () => void;
+  onStopPlay: () => void;
+  onFile: (file: File) => void;
+  onRemove: () => void;
+  onClose: () => void;
+}> = ({ player, isRecording, isPlaying, elapsedMs, onStart, onStop, onPlay, onStopPlay, onFile, onRemove, onClose }) => (
+  <div
+    onClick={isRecording ? undefined : onClose}
+    className="fixed inset-0 z-[60] bg-black/50 flex items-end sm:items-center justify-center p-4 pb-[calc(1rem+var(--safe-bottom))]"
+  >
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="w-full max-w-sm bg-card rounded-2xl shadow-2xl overflow-hidden"
+    >
+      <div className="px-4 py-3 border-b">
+        <div className="font-semibold">Voice for {player.name}</div>
+        <div className="text-xs text-muted-foreground">
+          Plays automatically when this player is highlighted after a submit (max {MAX_VOICE_MS / 1000}s).
+        </div>
+      </div>
+      {isRecording ? (
+        <button
+          onClick={onStop}
+          className="w-full flex items-center gap-3 px-4 py-3 bg-red-600/10 text-red-600 hover:bg-red-600/20 transition-colors"
+        >
+          <Square className="w-5 h-5" />
+          <span className="flex-1 text-left">Stop recording</span>
+          <span className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+            <span className="font-mono text-sm tabular-nums">
+              {(elapsedMs / 1000).toFixed(1)}s / {MAX_VOICE_MS / 1000}s
+            </span>
+          </span>
+        </button>
+      ) : canRecordVoice() ? (
+        <button
+          onClick={onStart}
+          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors"
+        >
+          <Mic className="w-5 h-5 text-primary" />
+          {player.voice ? 'Record again' : 'Start recording'}
+        </button>
+      ) : (
+        <div className="flex items-start gap-3 px-4 py-3 text-xs text-muted-foreground">
+          <Mic className="w-5 h-5 flex-shrink-0 opacity-50" />
+          <span>{recordUnavailableReason()} You can still pick a sound file below.</span>
+        </div>
+      )}
+      {!isRecording && (
+        <MediaInput
+          accept="audio/*"
+          onFile={onFile}
+          className="flex items-center gap-3 px-4 py-3 border-t hover:bg-accent transition-colors"
+        >
+          <Volume2 className="w-5 h-5 text-primary" />
+          {player.voice ? 'Replace with a sound file' : 'Choose a sound file'}
+        </MediaInput>
+      )}
+      {player.voice && !isRecording && (
+        <>
+          <button
+            onClick={isPlaying ? onStopPlay : onPlay}
+            className={`w-full flex items-center gap-3 px-4 py-3 border-t transition-colors ${
+              isPlaying ? 'bg-primary/10 hover:bg-primary/20' : 'hover:bg-accent'
+            }`}
+          >
+            {isPlaying ? <Square className="w-5 h-5 text-primary" /> : <Play className="w-5 h-5 text-primary" />}
+            <span className="flex-1 text-left">{isPlaying ? 'Playing…' : 'Play back'}</span>
+            {isPlaying && <Volume2 className="w-4 h-4 text-primary animate-pulse" />}
+          </button>
+          <button
+            onClick={() => { onClose(); onRemove(); }}
+            className="w-full flex items-center gap-3 px-4 py-3 border-t text-red-600 hover:bg-red-600/10 transition-colors"
+          >
+            <Trash2 className="w-5 h-5" />
+            Remove voice
+          </button>
+        </>
+      )}
+      <button
+        onClick={isRecording ? onStop : onClose}
+        className="w-full px-4 py-3 border-t text-muted-foreground hover:bg-accent transition-colors"
+      >
+        {isRecording ? 'Stop' : 'Close'}
+      </button>
+    </div>
+  </div>
+);
+
+type HighlightType = "first" | "last" | "gain" | "drop";
+
+type HighlightConfig = {
+  id: HighlightType;
+  label: string;
+  icon: LucideIcon;
+  card: string;
+  accent: string;
+  /** Higher is better: the winning player is the one with the largest value. */
+  value: (player: Player) => number;
+  /** Value rendered on the right of the card. */
+  display: (player: Player) => string;
+};
+
+const HIGHLIGHTS: HighlightConfig[] = [
+  {
+    id: "first",
+    label: "First rank",
+    icon: Crown,
+    card: "bg-yellow-500/10 border-yellow-500/40",
+    accent: "text-yellow-600",
+    value: (p) => p.score,
+    display: (p) => String(p.score),
+  },
+  {
+    id: "last",
+    label: "Last rank",
+    icon: ArrowDown,
+    card: "bg-red-500/10 border-red-500/40",
+    accent: "text-red-600",
+    value: (p) => -p.score,
+    display: (p) => String(p.score),
+  },
+  {
+    id: "gain",
+    label: "Biggest gain",
+    icon: TrendingUp,
+    card: "bg-green-500/10 border-green-500/40",
+    accent: "text-green-600",
+    value: (p) => p.score - p.previousScore,
+    display: (p) => `+${p.score - p.previousScore}`,
+  },
+  {
+    id: "drop",
+    label: "Biggest drop",
+    icon: TrendingDown,
+    card: "bg-orange-500/10 border-orange-500/40",
+    accent: "text-orange-600",
+    value: (p) => p.previousScore - p.score,
+    display: (p) => String(p.score - p.previousScore),
+  },
+];
+
+const getHighlight = (players: Player[], type: HighlightType) => {
+  const config = HIGHLIGHTS.find(h => h.id === type) ?? HIGHLIGHTS[0];
+  if (players.length === 0) return { config, winners: [] as Player[], player: undefined, tiedWith: 0 };
+
+  const values = players.map(p => config.value(p));
+  const best = Math.max(...values);
+  const tied = players.filter(p => config.value(p) === best);
+
+  // Everyone tied (all equal scores, or nobody moved) means there is nothing to highlight.
+  const isMeaningful = tied.length < players.length && (type === "first" || type === "last" || best > 0);
+  const winners = isMeaningful ? tied : [];
+
+  return {
+    config,
+    winners,
+    player: winners[0],
+    tiedWith: winners.length > 0 ? winners.length - 1 : 0,
+  };
+};
+
+/** All highlights a player currently holds, keyed by player id. */
+const getHighlightBadges = (players: Player[]) => {
+  const badges = new Map<number, HighlightConfig[]>();
+  HIGHLIGHTS.forEach(highlight => {
+    getHighlight(players, highlight.id).winners.forEach(winner => {
+      badges.set(winner.id, [...(badges.get(winner.id) ?? []), highlight]);
+    });
+  });
+  return badges;
+};
 
 const KnobScoreboard: React.FC = () => {
   const [rounds, setRounds] = useState<Player[][]>(() => {
@@ -55,6 +324,21 @@ const KnobScoreboard: React.FC = () => {
   const [editingPlayerId, setEditingPlayerId] = useState<number | null>(null);
   const [editingPlayerName, setEditingPlayerName] = useState<string>("");
   const [showIosInstall, setShowIosInstall] = useState<boolean>(false);
+  const [newPlayerPhoto, setNewPlayerPhoto] = useState<string | undefined>(undefined);
+  const [photoError, setPhotoError] = useState<string>("");
+  const [photoMenuFor, setPhotoMenuFor] = useState<number | "new" | null>(null);
+  const [voiceMenuFor, setVoiceMenuFor] = useState<number | null>(null);
+  const [playingFor, setPlayingFor] = useState<number | null>(null);
+  const [voiceFileError, setVoiceFileError] = useState<string>("");
+  const { recordingFor, elapsedMs, error: voiceError, start: startRecording, stop: stopRecording } = useVoiceRecorder();
+  const [highlightType, setHighlightType] = useState<HighlightType>(() => {
+    const saved = localStorage.getItem('scoreKnobHighlightType');
+    return HIGHLIGHTS.some(h => h.id === saved) ? (saved as HighlightType) : 'first';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('scoreKnobHighlightType', highlightType);
+  }, [highlightType]);
 
   const { canInstall, needsIosInstructions, isInstalled, isOffline, promptInstall } = usePwaInstall();
   const showInstallAction = !isInstalled && (canInstall || needsIosInstructions);
@@ -69,6 +353,7 @@ const KnobScoreboard: React.FC = () => {
   };
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const previousAngleRef = useRef<number>(0);
   const totalRotationRef = useRef<number>(0);
   const animationFrameRef = useRef<number | null>(null);
@@ -157,6 +442,25 @@ const KnobScoreboard: React.FC = () => {
     setIsDragging(false);
   };
 
+  const playVoice = (player: Player) => {
+    if (!player.voice) return;
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      audioRef.current.onended = () => setPlayingFor(null);
+      audioRef.current.onerror = () => setPlayingFor(null);
+    }
+    audioRef.current.pause();
+    audioRef.current.src = player.voice;
+    audioRef.current.currentTime = 0;
+    setPlayingFor(player.id);
+    void audioRef.current.play().catch(() => setPlayingFor(null));
+  };
+
+  const stopVoice = () => {
+    audioRef.current?.pause();
+    setPlayingFor(null);
+  };
+
   const handleSubmit = () => {
     // Calculate current ranks before commit for previous rank tracking
     const currentRanking = [...players]
@@ -164,14 +468,17 @@ const KnobScoreboard: React.FC = () => {
       .map((p, index) => ({ id: p.id, previousRank: index }));
 
     // Commit all pending scores to actual scores and update previous scores
-    setPlayers(prev =>
-      prev.map(p => ({
-        ...p,
-        previousScore: p.score,
-        previousRank: currentRanking.find(r => r.id === p.id)?.previousRank ?? 0,
-        score: p.pendingScore
-      }))
-    );
+    const committed = players.map(p => ({
+      ...p,
+      previousScore: p.score,
+      previousRank: currentRanking.find(r => r.id === p.id)?.previousRank ?? 0,
+      score: p.pendingScore
+    }));
+    setPlayers(committed);
+
+    // Cheer for whoever the highlight lands on with the new scores
+    const { player } = getHighlight(committed, highlightType);
+    if (player) playVoice(player);
   };
 
   useEffect(() => {
@@ -191,8 +498,39 @@ const KnobScoreboard: React.FC = () => {
   const addPlayer = () => {
     if (newPlayerName.trim()) {
       const newId = Math.max(...rounds.flat().map(p => p.id), 0) + 1;
-      setRounds(prev => prev.map(round => [...round, { id: newId, name: newPlayerName.trim(), score: 0, previousScore: 0, previousRank: -1, pendingScore: 0 }]));
+      setRounds(prev => prev.map(round => [...round, { id: newId, name: newPlayerName.trim(), score: 0, previousScore: 0, previousRank: -1, pendingScore: 0, photo: newPlayerPhoto }]));
       setNewPlayerName("");
+      setNewPlayerPhoto(undefined);
+    }
+  };
+
+  const readPhoto = async (file: File, apply: (photo: string | undefined) => void) => {
+    try {
+      apply(await fileToSquareDataUrl(file));
+      setPhotoError("");
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : "Could not read that photo");
+    }
+  };
+
+  const setPlayerPhoto = (id: number, photo: string | undefined) => {
+    setRounds(prev => prev.map(round => round.map(p => p.id === id ? { ...p, photo } : p)));
+  };
+
+  const setPlayerVoice = (id: number, voice: string | undefined) => {
+    setRounds(prev => prev.map(round => round.map(p => p.id === id ? { ...p, voice } : p)));
+  };
+
+  const readVoiceFile = async (id: number, file: File) => {
+    if (file.size > MAX_VOICE_BYTES) {
+      setVoiceFileError(`That sound is too large (max ${Math.round(MAX_VOICE_BYTES / 1024)} KB)`);
+      return;
+    }
+    try {
+      setPlayerVoice(id, await fileToDataUrl(file));
+      setVoiceFileError("");
+    } catch (error) {
+      setVoiceFileError(error instanceof Error ? error.message : "Could not read that sound");
     }
   };
 
@@ -200,6 +538,12 @@ const KnobScoreboard: React.FC = () => {
     setRounds(prev => prev.map(round => round.filter(p => p.id !== id)));
     if (activePlayerId === id) {
       setActivePlayerId(null);
+    }
+    if (photoMenuFor === id) {
+      setPhotoMenuFor(null);
+    }
+    if (voiceMenuFor === id) {
+      setVoiceMenuFor(null);
     }
   };
 
@@ -236,6 +580,7 @@ const KnobScoreboard: React.FC = () => {
   };
 
   const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+  const highlightBadges = getHighlightBadges(players);
 
   const getRankIcon = (rank: number) => {
     if (rank === 0) return <Trophy className="w-5 h-5 text-yellow-500" />;
@@ -284,6 +629,49 @@ const KnobScoreboard: React.FC = () => {
           {multiplier}x
         </button>
       </div>
+      {/* Player Highlight */}
+      {players.length > 0 && (() => {
+        const { config, player, tiedWith } = getHighlight(players, highlightType);
+        const Icon = config.icon;
+
+        return (
+          <div className="px-4 pt-3">
+            <button
+              onClick={() => {
+                const nextIndex = (HIGHLIGHTS.findIndex(h => h.id === config.id) + 1) % HIGHLIGHTS.length;
+                setHighlightType(HIGHLIGHTS[nextIndex].id);
+              }}
+              title="Tap to change highlight"
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border text-left transition-all active:scale-[0.99] ${
+                player ? config.card : 'bg-muted border-border'
+              }`}
+            >
+              {player ? (
+                <PlayerAvatar player={player} className="w-9 h-9 flex-shrink-0" />
+              ) : (
+                <div className="w-9 h-9 flex-shrink-0 rounded-full bg-background/70 flex items-center justify-center">
+                  <Icon className="w-4 h-4 text-muted-foreground" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <div className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide ${player ? config.accent : 'text-muted-foreground'}`}>
+                  <Icon className="w-3 h-3" />
+                  {config.label}
+                </div>
+                <div className="font-semibold text-sm truncate flex items-center gap-1">
+                  {player ? player.name : 'Nothing to highlight yet'}
+                  {player && tiedWith > 0 && <span className="text-muted-foreground font-normal">+{tiedWith}</span>}
+                  {player && playingFor === player.id && <Volume2 className="w-3 h-3 text-primary animate-pulse flex-shrink-0" />}
+                </div>
+              </div>
+              <div className="ml-auto flex items-center gap-2">
+                {player && <span className="text-lg font-bold text-primary">{config.display(player)}</span>}
+                <ChevronsUpDown className="w-4 h-4 text-muted-foreground" />
+              </div>
+            </button>
+          </div>
+        );
+      })()}
       <div className="flex-1 flex justify-center items-center p-4 w-full overflow-visible">
         <div
           ref={containerRef}
@@ -318,6 +706,7 @@ const KnobScoreboard: React.FC = () => {
             const finalRanks = [...players]
               .sort((a, b) => b.score - a.score)
               .map((p, i) => ({ id: p.id, rank: i }));
+            const highlight = getHighlight(players, highlightType);
 
             return players.map((player, index) => {
               const rotationOffset = players.length === 4 ? Math.PI / 4 : 0;
@@ -329,8 +718,8 @@ const KnobScoreboard: React.FC = () => {
               const currentRank = finalRanks.find(r => r.id === player.id)?.rank ?? index;
               const hasRanking = player.previousRank >= 0;
               const rankChange = player.previousRank - currentRank;
-              const isFirstRank = currentRank === 0 && hasRanking;
-              const isLastRank = currentRank === players.length - 1 && hasRanking;
+              const isHighlighted = highlight.winners.some(w => w.id === player.id);
+              const badges = highlightBadges.get(player.id) ?? [];
 
               return (
                 <div
@@ -338,7 +727,9 @@ const KnobScoreboard: React.FC = () => {
                   className={`absolute w-[80px] text-center cursor-pointer select-none p-2 rounded-xl transition-all duration-200 ${
                     activePlayerId === player.id 
                       ? 'bg-primary text-primary-foreground shadow-2xl scale-110 ring-4 ring-primary/30 animate-pulse' 
-                      : 'bg-muted text-foreground hover:bg-accent hover:scale-105'
+                      : isHighlighted
+                        ? `border ${highlight.config.card} text-foreground hover:scale-105`
+                        : 'bg-muted text-foreground hover:bg-accent hover:scale-105'
                   } ${activePlayerId && activePlayerId !== player.id ? 'opacity-40 blur-[1px]' : ''}`}
                   style={{
                     left: `${x}px`,
@@ -349,15 +740,20 @@ const KnobScoreboard: React.FC = () => {
                   onMouseDown={(e) => handleStart(e, player.id)}
                   onTouchStart={(e) => handleStart(e, player.id)}
                 >
-                  <div className="flex items-center justify-center gap-1 h-4">
-                    {isFirstRank && <Trophy className="w-3 h-3 text-yellow-500" />}
-                    {isLastRank && <span className="text-[10px] text-red-400 font-bold">LAST</span>}
+                  <div className="flex items-center justify-center gap-0.5 h-4">
+                    {playingFor === player.id && <Volume2 className="w-3 h-3 text-primary animate-pulse" />}
+                    {badges.map(({ id, icon: BadgeIcon, label, accent }) => (
+                      <span key={id} title={label} className={id === highlightType ? '' : 'opacity-50'}>
+                        <BadgeIcon className={`w-3 h-3 ${accent}`} />
+                      </span>
+                    ))}
                     {hasRanking && rankChange !== 0 && (
                       <span className={`text-[10px] ${rankChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {rankChange > 0 ? '↑' : '↓'}{Math.abs(rankChange)}
                       </span>
                     )}
                   </div>
+                  <PlayerAvatar player={player} className="w-10 h-10 mx-auto" />
                   <div className="font-semibold text-sm whitespace-nowrap">
                     {player.name}
                   </div>
@@ -461,6 +857,26 @@ const KnobScoreboard: React.FC = () => {
             {/* Add New Player */}
             <div className="p-4 border-b">
               <div className="flex gap-2">
+                <div className="relative flex-shrink-0">
+                  <button
+                    onClick={() => setPhotoMenuFor(photoMenuFor === 'new' ? null : 'new')}
+                    title="Add photo"
+                    className="w-10 h-10 rounded-full bg-muted border border-input flex items-center justify-center overflow-hidden hover:bg-accent transition-colors"
+                  >
+                    {newPlayerPhoto ? (
+                      <img src={newPlayerPhoto} alt="New player" className="w-full h-full object-cover" />
+                    ) : (
+                      <Camera className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </button>
+                  {photoMenuFor === 'new' && (
+                    <PhotoSourceSheet
+                      onFile={(file) => void readPhoto(file, setNewPlayerPhoto)}
+                      onRemove={newPlayerPhoto ? () => setNewPlayerPhoto(undefined) : undefined}
+                      onClose={() => setPhotoMenuFor(null)}
+                    />
+                  )}
+                </div>
                 <input
                   type="text"
                   placeholder="Player name"
@@ -476,6 +892,9 @@ const KnobScoreboard: React.FC = () => {
                   <Plus className="w-5 h-5" />
                 </button>
               </div>
+              {(photoError || voiceError || voiceFileError) && (
+                <div className="mt-2 text-xs text-red-600">{photoError || voiceError || voiceFileError}</div>
+              )}
             </div>
 
             {/* Player List */}
@@ -510,10 +929,68 @@ const KnobScoreboard: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      <div className="flex-1">
-                        <div className="font-semibold">{player.name}</div>
+                      <div className="relative flex-shrink-0">
+                        <button
+                          onClick={() => setPhotoMenuFor(photoMenuFor === player.id ? null : player.id)}
+                          title={player.photo ? "Change photo" : "Add photo"}
+                          className="w-11 h-11 rounded-full overflow-hidden ring-1 ring-border hover:ring-primary transition-all flex items-center justify-center bg-background"
+                        >
+                          {player.photo ? (
+                            <PlayerAvatar player={player} className="w-full h-full" />
+                          ) : (
+                            <Camera className="w-4 h-4 text-muted-foreground" />
+                          )}
+                        </button>
+                        {photoMenuFor === player.id && (
+                          <PhotoSourceSheet
+                            onFile={(file) => void readPhoto(file, (photo) => setPlayerPhoto(player.id, photo))}
+                            onRemove={player.photo ? () => setPlayerPhoto(player.id, undefined) : undefined}
+                            onClose={() => setPhotoMenuFor(null)}
+                          />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold truncate flex items-center gap-1">
+                          {player.name}
+                          {recordingFor === player.id ? (
+                            <span className="flex items-center gap-1 text-xs font-bold text-red-600 flex-shrink-0">
+                              <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+                              REC
+                            </span>
+                          ) : playingFor === player.id ? (
+                            <Volume2 className="w-3 h-3 text-primary flex-shrink-0 animate-pulse" />
+                          ) : player.voice ? (
+                            <Volume2 className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                          ) : null}
+                        </div>
                         <div className="text-sm text-muted-foreground">Score: {player.score}</div>
                       </div>
+                      <button
+                        onClick={() => setVoiceMenuFor(player.id)}
+                        title={player.voice ? "Change voice" : "Record voice"}
+                        className={`p-2 rounded-md transition-colors ${
+                          recordingFor === player.id
+                            ? 'text-red-600 bg-red-600/10 animate-pulse'
+                            : player.voice ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:bg-accent'
+                        }`}
+                      >
+                        <Mic className="w-4 h-4" />
+                      </button>
+                      {voiceMenuFor === player.id && (
+                        <VoiceSheet
+                          player={player}
+                          isRecording={recordingFor === player.id}
+                          isPlaying={playingFor === player.id}
+                          elapsedMs={elapsedMs}
+                          onStart={() => void startRecording(player.id, (voice) => setPlayerVoice(player.id, voice))}
+                          onStop={stopRecording}
+                          onPlay={() => playVoice(player)}
+                          onStopPlay={stopVoice}
+                          onFile={(file) => void readVoiceFile(player.id, file)}
+                          onRemove={() => { stopVoice(); setPlayerVoice(player.id, undefined); }}
+                          onClose={() => setVoiceMenuFor(null)}
+                        />
+                      )}
                       <button
                         onClick={() => startEditingPlayer(player)}
                         className="p-2 text-primary hover:bg-primary/10 rounded-md transition-colors"
@@ -534,7 +1011,7 @@ const KnobScoreboard: React.FC = () => {
 
             <div className="p-4 border-t space-y-2">
               <button
-                onClick={() => setShowPlayerManager(false)}
+                onClick={() => { setShowPlayerManager(false); setPhotoMenuFor(null); setVoiceMenuFor(null); setPhotoError(""); stopRecording(); stopVoice(); }}
                 className="w-full px-4 py-2 bg-muted text-foreground rounded-md hover:bg-accent transition-colors"
               >
                 Close
@@ -560,47 +1037,61 @@ const KnobScoreboard: React.FC = () => {
               {sortedPlayers.map((player, index) => {
                 const hasRanking = player.previousRank >= 0;
                 const rankChange = player.previousRank - index;
+                const badges = highlightBadges.get(player.id) ?? [];
 
                 return (
                 <div
                   key={player.id}
-                  className={`flex items-center gap-4 p-4 rounded-xl transition-all ${
+                  className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
                     index === 0 ? 'bg-yellow-500/10 border border-yellow-500/30' :
                     index === 1 ? 'bg-gray-400/10 border border-gray-400/30' :
                     index === 2 ? 'bg-amber-700/10 border border-amber-700/30' :
                     'bg-muted'
                   }`}
                 >
-                  <div className="flex items-center justify-center w-10">
+                  <div className="flex items-center justify-center w-6 flex-shrink-0">
                     {getRankIcon(index)}
                   </div>
+                  <PlayerAvatar player={player} className="w-10 h-10 flex-shrink-0 ring-1 ring-border" />
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold flex items-center gap-2 truncate">
-                      {player.name}
+                    <div className="font-semibold truncate">{player.name}</div>
+                    <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
+                      {badges.map(({ id, icon: BadgeIcon, label, accent }) => (
+                        <span key={id} title={label} className={id === highlightType ? '' : 'opacity-50'}>
+                          <BadgeIcon className={`w-3.5 h-3.5 ${accent}`} />
+                        </span>
+                      ))}
                       {hasRanking && rankChange !== 0 && (
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                          rankChange > 0 ? 'bg-green-500/20 text-green-600' : 'bg-red-500/20 text-red-600'
-                        }`}>
-                          {rankChange > 0 ? '↑' : '↓'} {Math.abs(rankChange)}
+                        <span className={`font-bold ${rankChange > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {rankChange > 0 ? '↑' : '↓'}{Math.abs(rankChange)}
                         </span>
                       )}
+                      {player.previousScore !== player.score && <span>was {player.previousScore}</span>}
                     </div>
-                    {player.previousScore !== player.score && (
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        was {player.previousScore}
-                      </div>
-                    )}
                   </div>
-                  <div className="flex flex-col items-end">
-                    <div className="text-2xl font-bold text-primary">{player.score}</div>
+                  <div className="flex flex-col items-end flex-shrink-0">
+                    <div className="text-2xl font-bold text-primary leading-none">{player.score}</div>
                     {player.score !== player.previousScore && (
-                      <div className={`text-sm font-semibold ${
+                      <div className={`text-xs font-semibold mt-0.5 ${
                         player.score > player.previousScore ? 'text-green-600' : 'text-red-600'
                       }`}>
                         {player.score > player.previousScore ? '+' : ''}{player.score - player.previousScore}
                       </div>
                     )}
                   </div>
+                  {player.voice && (
+                    <button
+                      onClick={() => playingFor === player.id ? stopVoice() : playVoice(player)}
+                      title={playingFor === player.id ? "Stop voice" : "Play voice"}
+                      className={`w-9 h-9 flex-shrink-0 rounded-full flex items-center justify-center transition-colors ${
+                        playingFor === player.id
+                          ? 'bg-primary text-primary-foreground animate-pulse'
+                          : 'bg-primary/10 text-primary hover:bg-primary/20'
+                      }`}
+                    >
+                      {playingFor === player.id ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                    </button>
+                  )}
                 </div>
               );
               })}
@@ -613,7 +1104,7 @@ const KnobScoreboard: React.FC = () => {
 
             <div className="p-4 border-t">
               <button
-                onClick={() => setShowLeaderboard(false)}
+                onClick={() => { setShowLeaderboard(false); stopVoice(); }}
                 className="w-full px-4 py-2 bg-muted text-foreground rounded-md hover:bg-accent transition-colors"
               >
                 Close

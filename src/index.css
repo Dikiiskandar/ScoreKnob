@@ -113,6 +113,7 @@
 @layer base {
   :root {
     --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
   }
   * {
     @apply border-border outline-ring/50;

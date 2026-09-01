@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Frown, Hand, Laugh, Minus, Plus, RotateCcw, Smile, Undo2, Volume2, VolumeX } from "lucide-react";
+import { Download, Frown, Hand, Laugh, Minus, Plus, RotateCcw, Share, Smile, Undo2, Volume2, VolumeX } from "lucide-react";
 import FloatingDock, { type DockItem } from "@/components/FloatingDock";
 import { useOrientationLock } from "@/hooks/useOrientationLock";
 import { useSpeech } from "@/hooks/useSpeech";
+import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { playReaction, preloadReactions } from "@/lib/reactions";
 
 type Side = "home" | "away";
@@ -141,9 +142,21 @@ const SidePanel: React.FC<{
 
 const Versus: React.FC = () => {
   const [state, setState] = useState<VersusState>(loadState);
+  const [showIosInstall, setShowIosInstall] = useState<boolean>(false);
   /** Undo stacks per round index, so switching rounds keeps each history intact. */
   const history = useRef<Record<number, Scores[]>>({});
   const { enabled: speechOn, setEnabled: setSpeechOn, speak, supported: speechSupported } = useSpeech();
+  const { canInstall, needsIosInstructions, isInstalled, promptInstall } = usePwaInstall();
+  const showInstallAction = !isInstalled && (canInstall || needsIosInstructions);
+
+  const handleInstall = () => {
+    if (canInstall) {
+      void promptInstall();
+      return;
+    }
+    setShowIosInstall(true);
+  };
+
   // Side-by-side scoring only fits in landscape; devices that reject the lock keep the portrait layout.
   useOrientationLock("landscape");
 
@@ -224,6 +237,15 @@ const Versus: React.FC = () => {
           >
             <RotateCcw className="w-5 h-5" />
           </button>
+          {showInstallAction && (
+            <button
+              onClick={handleInstall}
+              aria-label="Install app"
+              className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
+            >
+              <Download className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -267,6 +289,42 @@ const Versus: React.FC = () => {
       </div>
 
       <FloatingDock items={REACTIONS} icon={Smile} label="Reactions" storageKey="scoreKnobReactionDock" />
+
+      {/* Add to Home Screen (iOS) */}
+      {showIosInstall && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pt-[calc(1rem+var(--safe-top))]">
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <h2 className="text-xl font-bold">Add to Home Screen</h2>
+            <p className="text-sm text-muted-foreground">
+              Install Diki Lab to play offline with a full-screen app icon.
+            </p>
+            <ol className="space-y-3 text-sm">
+              <li className="flex items-center gap-3">
+                <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center font-bold text-xs">1</span>
+                <span className="flex items-center gap-1">
+                  Tap the <Share className="w-4 h-4 inline" /> Share button in Safari
+                </span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center font-bold text-xs">2</span>
+                <span className="flex items-center gap-1">
+                  Choose <Plus className="w-4 h-4 inline" /> Add to Home Screen
+                </span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center font-bold text-xs">3</span>
+                <span>Tap Add to confirm</span>
+              </li>
+            </ol>
+            <button
+              onClick={() => setShowIosInstall(false)}
+              className="w-full px-4 py-2 bg-muted text-foreground rounded-md hover:bg-accent transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

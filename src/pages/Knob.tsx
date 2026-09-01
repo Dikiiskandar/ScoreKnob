@@ -1,10 +1,12 @@
 import React, { useRef, useState, useEffect } from "react";
-import { RotateCw, Plus, Trash2, Edit2, X, Trophy, Medal, MoreVertical, Download, WifiOff, Share, Camera, Crown, TrendingDown, TrendingUp, ChevronsUpDown, ArrowDown, Image as ImageIcon, Mic, Square, Play, Volume2 } from "lucide-react";
+import { RotateCw, Plus, Trash2, Edit2, X, Trophy, Medal, MoreVertical, Download, WifiOff, Share, Camera, Crown, TrendingDown, TrendingUp, ChevronsUpDown, ArrowDown, Image as ImageIcon, Mic, Square, Play, Volume2, Frown, Hand, Laugh, Smile } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { useVoiceRecorder, canRecordVoice, recordUnavailableReason, MAX_VOICE_MS } from "@/hooks/useVoiceRecorder";
 import { fileToSquareDataUrl } from "@/lib/image";
 import { fileToDataUrl } from "@/lib/file";
+import FloatingDock, { type DockItem } from "@/components/FloatingDock";
+import { playReaction, preloadReactions } from "@/lib/reactions";
 
 type Player = {
   id: number;
@@ -339,6 +341,13 @@ const KnobScoreboard: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('scoreKnobHighlightType', highlightType);
   }, [highlightType]);
+
+  const REACTIONS: DockItem[] = [
+    { id: "applause", icon: Hand, label: "Applause", onSelect: () => void playReaction("applause") },
+    { id: "laugh", icon: Laugh, label: "Laugh", onSelect: () => void playReaction("laugh") },
+    { id: "sad", icon: Frown, label: "Sad", onSelect: () => void playReaction("sad") },
+  ];
+  useEffect(preloadReactions, []);
 
   const { canInstall, needsIosInstructions, isInstalled, isOffline, promptInstall } = usePwaInstall();
   const showInstallAction = !isInstalled && (canInstall || needsIosInstructions);
@@ -1172,6 +1181,8 @@ const KnobScoreboard: React.FC = () => {
           +
         </button>
       </div>
+
+      <FloatingDock items={REACTIONS} icon={Smile} label="Reactions" storageKey="scoreKnobReactionDockKnob" />
     </div>
   );
 };

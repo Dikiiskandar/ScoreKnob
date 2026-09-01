@@ -16,8 +16,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['apple-touch-icon.png', 'favicon.png', 'logo.svg'],
       manifest: {
-        name: 'ScoreKnob',
-        short_name: 'ScoreKnob',
+        name: 'Diki Lab',
+        short_name: 'Diki Lab',
         description: 'Rotary scoreboard for tracking player scores offline.',
         start_url: 'knob-page',
         scope: './',

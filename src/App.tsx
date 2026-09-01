@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import Navigation from './components/Navigation'
 import ThemeProvider from './components/ThemeProvider'
@@ -9,6 +10,16 @@ import Versus from './pages/Versus'
 function App() {
   const location = useLocation();
   const isFullscreenPage = ['/knob-page', '/versus'].includes(location.pathname);
+
+  useEffect(() => {
+    const titles: Record<string, string> = {
+      '/': 'Diki Lab',
+      '/about': 'Diki Lab',
+      '/knob-page': 'Diki Lab: Knob Score',
+      '/versus': 'Diki Lab: Versus Score',
+    }
+    document.title = titles[location.pathname] ?? 'Diki Lab'
+  }, [location.pathname])
 
   return (
     <ThemeProvider>

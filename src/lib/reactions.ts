@@ -1,4 +1,8 @@
-/** Crowd reaction clips from `public/sounds`, decoded once and replayed on tap. */
+/**
+ * Shared Web Audio plumbing for reaction sounds. Built-in clips are fetched
+ * from `public/sounds`; custom ones come from data URLs. Everything decodes
+ * through one AudioContext, and new playback interrupts the current clip.
+ */
 
 export type Reaction = "applause" | "laugh" | "sad";
 
@@ -10,9 +14,15 @@ const CLIPS: Record<Reaction, string> = {
 
 export const REACTION_KINDS = Object.keys(CLIPS) as Reaction[];
 
+export const REACTION_LABELS: Record<Reaction, string> = {
+  applause: "Applause",
+  laugh: "Laugh",
+  sad: "Sad",
+};
+
 let ctx: AudioContext | null = null;
-const downloads = new Map<Reaction, Promise<ArrayBuffer>>();
-const decoded = new Map<Reaction, AudioBuffer>();
+const downloads = new Map<string, Promise<ArrayBuffer>>();
+const decoded = new Map<string, AudioBuffer>();
 let playing: AudioBufferSourceNode | null = null;
 
 /**
@@ -30,11 +40,10 @@ const audio = () => {
   return ctx;
 };
 
-const download = (reaction: Reaction) => {
-  const cached = downloads.get(reaction);
+const download = (key: string, url: string) => {
+  const cached = downloads.get(key);
   if (cached) return cached;
 
-  const url = `${import.meta.env.BASE_URL}${CLIPS[reaction]}`;
   const request = fetch(url)
     .then((response) => {
       if (!response.ok) throw new Error(`${url} responded ${response.status}`);
@@ -42,38 +51,38 @@ const download = (reaction: Reaction) => {
     })
     .catch((error: unknown) => {
       // Allow a later tap to retry, e.g. after the network comes back.
-      downloads.delete(reaction);
+      downloads.delete(key);
       throw error;
     });
 
-  downloads.set(reaction, request);
+  downloads.set(key, request);
   return request;
 };
 
-/** Fetches the clips ahead of time; decoding waits for the first tap. */
-export const preloadReactions = () => {
-  REACTION_KINDS.forEach((reaction) =>
-    void download(reaction).catch((error: unknown) =>
-      console.warn(`Could not fetch the ${reaction} clip`, error),
-    ),
-  );
+const decode = async (context: AudioContext, key: string, url: string) => {
+  const cached = decoded.get(key);
+  if (cached) return cached;
+
+  // decodeAudioData detaches the buffer it is given, so decode a copy.
+  const bytes = await download(key, url);
+  const buffer = await context.decodeAudioData(bytes.slice(0));
+  decoded.set(key, buffer);
+  return buffer;
 };
 
-export const playReaction = async (reaction: Reaction) => {
+/** Plays one clip, interrupting whatever is currently sounding. */
+const play = async (key: string, url: string, warn: string) => {
   // Touch the context first so the gesture that triggered this unlocks audio.
   const context = audio();
 
   try {
-    let buffer = decoded.get(reaction);
-    if (!buffer) {
-      // decodeAudioData detaches the buffer it is given, so decode a copy.
-      const bytes = await download(reaction);
-      buffer = await context.decodeAudioData(bytes.slice(0));
-      decoded.set(reaction, buffer);
-    }
+    const buffer = await decode(context, key, url);
 
-    // One reaction at a time, so tapping again interrupts instead of piling up.
-    playing?.stop();
+    try {
+      playing?.stop();
+    } catch {
+      // The previous source already finished on its own.
+    }
     const source = context.createBufferSource();
     source.buffer = buffer;
     source.connect(context.destination);
@@ -83,6 +92,22 @@ export const playReaction = async (reaction: Reaction) => {
     source.start();
     playing = source;
   } catch (error) {
-    console.warn(`Could not play the ${reaction} reaction`, error);
+    console.warn(warn, error);
   }
 };
+
+/** Fetches the built-in clips ahead of time; decoding waits for the first tap. */
+export const preloadReactions = () => {
+  REACTION_KINDS.forEach((reaction) =>
+    void download(reaction, `${import.meta.env.BASE_URL}${CLIPS[reaction]}`).catch((error: unknown) =>
+      console.warn(`Could not fetch the ${reaction} clip`, error),
+    ),
+  );
+};
+
+export const playReaction = async (reaction: Reaction) =>
+  play(reaction, `${import.meta.env.BASE_URL}${CLIPS[reaction]}`, `Could not play the ${reaction} reaction`);
+
+/** Plays a user-chosen clip, e.g. a data URL; the key keeps one decode cache per reaction. */
+export const playSound = (key: string, url: string) =>
+  play(`custom:${key}`, url, "Could not play the custom reaction");

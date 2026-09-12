@@ -1,16 +1,19 @@
 import React, { useRef, useState, useEffect } from "react";
-import { RotateCw, RotateCcw, Plus, Trash2, Edit2, X, Trophy, Medal, Download, WifiOff, Camera, Crown, TrendingDown, TrendingUp, ChevronsUpDown, ArrowDown, Image as ImageIcon, Mic, Square, Play, Volume2, Frown, Hand, Laugh, Smile } from "lucide-react";
+import { RotateCw, RotateCcw, Plus, Trash2, Edit2, X, Trophy, Medal, Download, WifiOff, Camera, Crown, TrendingDown, TrendingUp, ChevronsUpDown, ArrowDown, Image as ImageIcon, Mic, Square, Play, Volume2, Smile } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useInstallAction } from "@/hooks/useInstallAction";
+import { useReactionDock } from "@/hooks/useReactionDock";
 import { useVoiceRecorder, canRecordVoice, recordUnavailableReason, MAX_VOICE_MS } from "@/hooks/useVoiceRecorder";
 import { fileToSquareDataUrl } from "@/lib/image";
 import { fileToDataUrl } from "@/lib/file";
-import FloatingDock, { type DockItem } from "@/components/FloatingDock";
+import FloatingDock from "@/components/FloatingDock";
 import IconButton from "@/components/IconButton";
 import IosInstallSheet from "@/components/IosInstallSheet";
+import MediaInput from "@/components/MediaInput";
 import Modal, { SheetHeader, SheetRow } from "@/components/Modal";
+import ReactionManagerSheet from "@/components/ReactionManagerSheet";
 import RoundSwitcher from "@/components/RoundSwitcher";
-import { playReaction, preloadReactions } from "@/lib/reactions";
+import { preloadReactions } from "@/lib/reactions";
 
 type Player = {
   id: number;
@@ -35,31 +38,6 @@ const PlayerAvatar: React.FC<{ player: Player; className?: string }> = ({ player
   player.photo ? (
     <img src={player.photo} alt={player.name} className={`rounded-full object-cover ${className}`} />
   ) : null;
-
-const MediaInput: React.FC<{
-  onFile: (file: File) => void;
-  accept?: string;
-  /** Ask the device for its camera/recorder instead of the file browser. */
-  capture?: boolean | "user" | "environment";
-  className?: string;
-  title?: string;
-  children: React.ReactNode;
-}> = ({ onFile, accept = "image/*", capture, className = "", title, children }) => (
-  <label className={`cursor-pointer ${className}`} title={title}>
-    <input
-      type="file"
-      accept={accept}
-      capture={capture}
-      className="hidden"
-      onChange={(e) => {
-        const file = e.target.files?.[0];
-        if (file) onFile(file);
-        e.target.value = "";
-      }}
-    />
-    {children}
-  </label>
-);
 
 /** Lets the user pick a photo source: the camera or a file on the device. */
 const PhotoSourceSheet: React.FC<{
@@ -332,11 +310,8 @@ const KnobScoreboard: React.FC = () => {
     };
   }, []);
 
-  const REACTIONS: DockItem[] = [
-    { id: "applause", icon: Hand, label: "Applause", onSelect: () => void playReaction("applause") },
-    { id: "laugh", icon: Laugh, label: "Laugh", onSelect: () => void playReaction("laugh") },
-    { id: "sad", icon: Frown, label: "Sad", onSelect: () => void playReaction("sad") },
-  ];
+  const reactionItems = useReactionDock();
+  const [showReactions, setShowReactions] = useState<boolean>(false);
   useEffect(preloadReactions, []);
 
   const { showInstallAction, showIosInstall, handleInstall, closeIosInstall, isOffline } = useInstallAction();
@@ -1101,7 +1076,15 @@ const KnobScoreboard: React.FC = () => {
         onAdd={addRound}
       />
 
-      <FloatingDock items={REACTIONS} icon={Smile} label="Reactions" storageKey="scoreKnobReactionDockKnob" />
+      <FloatingDock
+        items={reactionItems}
+        icon={Smile}
+        label="Reactions"
+        storageKey="scoreKnobReactionDockKnob"
+        onManage={() => setShowReactions(true)}
+      />
+
+      {showReactions && <ReactionManagerSheet onClose={() => setShowReactions(false)} />}
     </div>
   );
 };

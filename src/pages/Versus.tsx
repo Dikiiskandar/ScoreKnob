@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Download, Frown, Hand, Laugh, Minus, RotateCcw, Smile, Undo2, Volume2, VolumeX } from "lucide-react";
-import FloatingDock, { type DockItem } from "@/components/FloatingDock";
+import { Download, Minus, RotateCcw, Smile, Undo2, Volume2, VolumeX } from "lucide-react";
+import FloatingDock from "@/components/FloatingDock";
 import IconButton from "@/components/IconButton";
 import IosInstallSheet from "@/components/IosInstallSheet";
+import ReactionManagerSheet from "@/components/ReactionManagerSheet";
 import RoundSwitcher from "@/components/RoundSwitcher";
 import { useInstallAction } from "@/hooks/useInstallAction";
 import { useOrientationLock } from "@/hooks/useOrientationLock";
+import { useReactionDock } from "@/hooks/useReactionDock";
 import { useSpeech } from "@/hooks/useSpeech";
-import { playReaction, preloadReactions } from "@/lib/reactions";
+import { preloadReactions } from "@/lib/reactions";
 
 type Side = "home" | "away";
 type Scores = Record<Side, number>;
@@ -44,12 +46,6 @@ const loadState = (): VersusState => {
     return defaultState;
   }
 };
-
-const REACTIONS: DockItem[] = [
-  { id: "applause", icon: Hand, label: "Applause", onSelect: () => void playReaction("applause") },
-  { id: "laugh", icon: Laugh, label: "Laugh", onSelect: () => void playReaction("laugh") },
-  { id: "sad", icon: Frown, label: "Sad", onSelect: () => void playReaction("sad") },
-];
 
 /** A round belongs to whoever scored more in it; equal scores belong to nobody. */
 const roundsWonBy = (side: Side, rounds: Scores[]) =>
@@ -137,6 +133,8 @@ const SidePanel: React.FC<{
 
 const Versus: React.FC = () => {
   const [state, setState] = useState<VersusState>(loadState);
+  const reactionItems = useReactionDock();
+  const [showReactions, setShowReactions] = useState<boolean>(false);
   /** Undo stacks per round index, so switching rounds keeps each history intact. */
   const history = useRef<Record<number, Scores[]>>({});
   const { enabled: speechOn, setEnabled: setSpeechOn, speak, supported: speechSupported } = useSpeech();
@@ -245,7 +243,15 @@ const Versus: React.FC = () => {
         />
       </div>
 
-      <FloatingDock items={REACTIONS} icon={Smile} label="Reactions" storageKey="scoreKnobReactionDock" />
+      <FloatingDock
+        items={reactionItems}
+        icon={Smile}
+        label="Reactions"
+        storageKey="scoreKnobReactionDock"
+        onManage={() => setShowReactions(true)}
+      />
+
+      {showReactions && <ReactionManagerSheet onClose={() => setShowReactions(false)} />}
 
       {showIosInstall && <IosInstallSheet appName="Diki Lab" onClose={closeIosInstall} />}
     </div>

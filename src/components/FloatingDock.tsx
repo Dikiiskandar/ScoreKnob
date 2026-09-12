@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { Plus } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type DockItem = {
@@ -42,7 +43,9 @@ const FloatingDock: React.FC<{
   icon: LucideIcon;
   label: string;
   storageKey: string;
-}> = ({ items, icon: Icon, label, storageKey }) => {
+  /** Shows a trailing "+" button in the open tray, e.g. to manage the items. */
+  onManage?: () => void;
+}> = ({ items, icon: Icon, label, storageKey, onManage }) => {
   const [placement, setPlacement] = useState(() => loadPlacement(storageKey));
   const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight });
   /** Live pixel position while a drag is in progress. */
@@ -178,6 +181,19 @@ const FloatingDock: React.FC<{
               <ItemIcon className="w-5 h-5" />
             </button>
           ))}
+          {onManage && (
+            <button
+              onClick={() => {
+                onManage();
+                setOpen(false);
+              }}
+              aria-label="Manage reactions"
+              title="Manage reactions"
+              className="w-10 h-10 flex-shrink-0 rounded-full border-2 border-dashed border-muted-foreground/50 text-muted-foreground hover:bg-accent active:scale-95 transition-all flex items-center justify-center"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          )}
         </div>
       )}
     </div>

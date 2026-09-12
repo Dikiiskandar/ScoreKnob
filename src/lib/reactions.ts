@@ -96,17 +96,20 @@ const play = async (key: string, url: string, warn: string) => {
   }
 };
 
+/** Absolute URL of a built-in clip, for reusing it outside the dock (e.g. as a player voice). */
+export const reactionUrl = (reaction: Reaction) => `${import.meta.env.BASE_URL}${CLIPS[reaction]}`;
+
 /** Fetches the built-in clips ahead of time; decoding waits for the first tap. */
 export const preloadReactions = () => {
   REACTION_KINDS.forEach((reaction) =>
-    void download(reaction, `${import.meta.env.BASE_URL}${CLIPS[reaction]}`).catch((error: unknown) =>
+    void download(reaction, reactionUrl(reaction)).catch((error: unknown) =>
       console.warn(`Could not fetch the ${reaction} clip`, error),
     ),
   );
 };
 
 export const playReaction = async (reaction: Reaction) =>
-  play(reaction, `${import.meta.env.BASE_URL}${CLIPS[reaction]}`, `Could not play the ${reaction} reaction`);
+  play(reaction, reactionUrl(reaction), `Could not play the ${reaction} reaction`);
 
 /** Plays a user-chosen clip, e.g. a data URL; the key keeps one decode cache per reaction. */
 export const playSound = (key: string, url: string) =>

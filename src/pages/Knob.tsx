@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { RotateCw, RotateCcw, Plus, Trash2, Edit2, X, Trophy, Medal, Download, WifiOff, Camera, Crown, TrendingDown, TrendingUp, ChevronsUpDown, ArrowDown, Image as ImageIcon, Mic, Square, Play, Volume2, Smile } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useInstallAction } from "@/hooks/useInstallAction";
@@ -13,7 +14,9 @@ import MediaInput from "@/components/MediaInput";
 import Modal, { SheetHeader, SheetRow } from "@/components/Modal";
 import ReactionManagerSheet from "@/components/ReactionManagerSheet";
 import RoundSwitcher from "@/components/RoundSwitcher";
-import { preloadReactions } from "@/lib/reactions";
+import { REACTION_KINDS, REACTION_LABELS, playReaction, playSound, preloadReactions, reactionUrl } from "@/lib/reactions";
+import { REACTION_ICONS } from "@/lib/reactionIcons";
+import { useReactionStore } from "@/store/useReactionStore";
 
 type Player = {
   id: number;
@@ -84,10 +87,11 @@ const VoiceSheet: React.FC<{
   onStop: () => void;
   onPlay: () => void;
   onStopPlay: () => void;
+  onPickReaction: () => void;
   onFile: (file: File) => void;
   onRemove: () => void;
   onClose: () => void;
-}> = ({ player, isRecording, isPlaying, elapsedMs, onStart, onStop, onPlay, onStopPlay, onFile, onRemove, onClose }) => (
+}> = ({ player, isRecording, isPlaying, elapsedMs, onStart, onStop, onPlay, onStopPlay, onPickReaction, onFile, onRemove, onClose }) => (
   <Modal variant="bottom" maxWidth="max-w-sm" backdropClassName="z-[60]" onClose={isRecording ? undefined : onClose}>
     <SheetHeader
       title={`Voice for ${player.name}`}
@@ -125,6 +129,12 @@ const VoiceSheet: React.FC<{
         {player.voice ? 'Replace with a sound file' : 'Choose a sound file'}
       </MediaInput>
     )}
+    {!isRecording && (
+      <SheetRow onClick={onPickReaction}>
+        <Smile className="w-5 h-5 text-primary" />
+        Use a reaction sound
+      </SheetRow>
+    )}
     {player.voice && !isRecording && (
       <>
         <SheetRow active={isPlaying} onClick={isPlaying ? onStopPlay : onPlay}>
@@ -143,6 +153,57 @@ const VoiceSheet: React.FC<{
     </SheetRow>
   </Modal>
 );
+
+/** Pick one of the reaction sounds (built-in or custom) as this player's voice. */
+const ReactionSoundPicker: React.FC<{
+  onPick: (sound: string) => void;
+  onClose: () => void;
+}> = ({ onPick, onClose }) => {
+  const customs = useReactionStore((state) => state.customs);
+  return (
+    <Modal variant="bottom" maxWidth="max-w-sm" backdropClassName="z-[70]" onClose={onClose}>
+      <SheetHeader
+        title="Pick a reaction sound"
+        description="Uses one of the reaction clips as this player's highlight sound."
+      />
+      <div className="overflow-y-auto max-h-[50vh]">
+        {REACTION_KINDS.map((kind) => {
+          const Icon = REACTION_ICONS[kind];
+          return (
+            <SheetRow key={kind} onClick={() => onPick(reactionUrl(kind))}>
+              <Icon className="w-5 h-5 text-primary" />
+              <span className="flex-1 text-left">{REACTION_LABELS[kind]}</span>
+              <IconButton
+                aria-label={`Play ${REACTION_LABELS[kind]}`}
+                onClick={(e) => { e.stopPropagation(); void playReaction(kind); }}
+              >
+                <Play className="w-4 h-4" />
+              </IconButton>
+            </SheetRow>
+          );
+        })}
+        {customs.map((reaction) => {
+          const Icon = REACTION_ICONS[reaction.icon] ?? REACTION_ICONS.music;
+          return (
+            <SheetRow key={reaction.id} onClick={() => onPick(reaction.sound)}>
+              <Icon className="w-5 h-5 text-primary" />
+              <span className="flex-1 text-left">{reaction.name}</span>
+              <IconButton
+                aria-label={`Play ${reaction.name}`}
+                onClick={(e) => { e.stopPropagation(); void playSound(reaction.id, reaction.sound); }}
+              >
+                <Play className="w-4 h-4" />
+              </IconButton>
+            </SheetRow>
+          );
+        })}
+      </div>
+      <SheetRow onClick={onClose} className="text-muted-foreground">
+        Cancel
+      </SheetRow>
+    </Modal>
+  );
+};
 
 type HighlightType = "first" | "last" | "gain" | "drop";
 
@@ -269,6 +330,7 @@ const KnobScoreboard: React.FC = () => {
   const [photoError, setPhotoError] = useState<string>("");
   const [photoMenuFor, setPhotoMenuFor] = useState<number | "new" | null>(null);
   const [voiceMenuFor, setVoiceMenuFor] = useState<number | null>(null);
+  const [reactionPickFor, setReactionPickFor] = useState<number | null>(null);
   const [playingFor, setPlayingFor] = useState<number | null>(null);
   const [voiceFileError, setVoiceFileError] = useState<string>("");
   const { recordingFor, elapsedMs, error: voiceError, start: startRecording, stop: stopRecording } = useVoiceRecorder();
@@ -509,6 +571,9 @@ const KnobScoreboard: React.FC = () => {
     if (voiceMenuFor === id) {
       setVoiceMenuFor(null);
     }
+    if (reactionPickFor === id) {
+      setReactionPickFor(null);
+    }
   };
 
   const startEditingPlayer = (player: Player) => {
@@ -565,7 +630,9 @@ const KnobScoreboard: React.FC = () => {
           {activePlayerId ? (
             <div className="font-bold text-lg">{players.find((p) => p.id === activePlayerId)?.name}</div>
           ) : (
-            <img src="./logo.svg" className="w-6 h-6" alt="Diki Lab" />
+            <Link to="/" aria-label="ScoreKnob" className="shrink-0">
+              <img src="./logo.svg" className="w-6 h-6" alt="ScoreKnob" />
+            </Link>
           )}
           {isOffline && (
             <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 text-xs font-semibold" title="You are offline. Scores are saved on this device.">
@@ -943,6 +1010,7 @@ const KnobScoreboard: React.FC = () => {
                           onStop={stopRecording}
                           onPlay={() => playVoice(player)}
                           onStopPlay={stopVoice}
+                          onPickReaction={() => setReactionPickFor(player.id)}
                           onFile={(file) => void readVoiceFile(player.id, file)}
                           onRemove={() => { stopVoice(); setPlayerVoice(player.id, undefined); }}
                           onClose={() => setVoiceMenuFor(null)}
@@ -1085,6 +1153,22 @@ const KnobScoreboard: React.FC = () => {
       />
 
       {showReactions && <ReactionManagerSheet onClose={() => setShowReactions(false)} />}
+
+      {(() => {
+        if (reactionPickFor === null) return null;
+        const pickTarget = players.find(p => p.id === reactionPickFor);
+        if (!pickTarget) return null;
+        return (
+          <ReactionSoundPicker
+            onPick={(sound) => {
+              stopVoice();
+              setPlayerVoice(reactionPickFor, sound);
+              setReactionPickFor(null);
+            }}
+            onClose={() => setReactionPickFor(null)}
+          />
+        );
+      })()}
     </div>
   );
 };

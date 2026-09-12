@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { Download, Minus, RotateCcw, Smile, Undo2, Volume2, VolumeX } from "lucide-react";
 import FloatingDock from "@/components/FloatingDock";
 import IconButton from "@/components/IconButton";
@@ -184,7 +185,9 @@ const Versus: React.FC = () => {
   return (
     <div className="h-full flex flex-col">
       <div className="h-[calc(56px+var(--safe-top))] pt-safe flex items-center justify-between px-2 border-b bg-card">
-        <img src="./logo.svg" className="w-6 h-6" alt="Diki Lab" />
+        <Link to="/" aria-label="ScoreKnob" className="shrink-0">
+          <img src="./logo.svg" className="w-6 h-6" alt="ScoreKnob" />
+        </Link>
         <div className="flex items-center gap-2 text-sm font-semibold tabular-nums">
           <span>{roundsWonBy("home", rounds)}</span>
           <span className="text-xs uppercase tracking-widest text-muted-foreground">rounds won</span>

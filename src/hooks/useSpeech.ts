@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { SUNDANESE_LANG, pickVoice, translateScore } from '@/lib/sundanese';
 
 const STORAGE_KEY = 'scoreKnobSpeech';
 const LANG_KEY = 'scoreKnobSpeechLang';
@@ -35,6 +36,8 @@ export function useSpeech() {
   const languages = useMemo(() => {
     const unique = new Set<string>();
     voices.forEach((voice) => unique.add(voice.lang));
+    // No device ships a Sundanese voice, so offer it unconditionally.
+    unique.add(SUNDANESE_LANG);
     return Array.from(unique).sort((a, b) => a.localeCompare(b));
   }, [voices]);
 
@@ -45,7 +48,12 @@ export function useSpeech() {
       // Drop any queued announcement so fast tapping always says the latest score.
       speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      if (lang !== 'auto') {
+      if (lang === SUNDANESE_LANG) {
+        utterance.text = translateScore(text);
+        const voice = pickVoice(voices);
+        utterance.lang = voice ? voice.lang : SUNDANESE_LANG;
+        if (voice) utterance.voice = voice;
+      } else if (lang !== 'auto') {
         utterance.lang = lang;
         const voice = voices.find((v) => v.lang === lang);
         if (voice) utterance.voice = voice;

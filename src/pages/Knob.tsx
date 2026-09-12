@@ -341,6 +341,35 @@ const KnobScoreboard: React.FC = () => {
     localStorage.setItem('scoreKnobHighlightType', highlightType);
   }, [highlightType]);
 
+  useEffect(() => {
+    let wakeLock: WakeLockSentinel | null = null;
+
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch {
+        // Wake lock may not be supported or permitted; ignore silently.
+      }
+    };
+
+    void requestWakeLock();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void requestWakeLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      wakeLock?.release().catch(() => {});
+    };
+  }, []);
+
   const REACTIONS: DockItem[] = [
     { id: "applause", icon: Hand, label: "Applause", onSelect: () => void playReaction("applause") },
     { id: "laugh", icon: Laugh, label: "Laugh", onSelect: () => void playReaction("laugh") },

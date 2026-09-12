@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Download, Minus, RotateCcw, Smile, Undo2, Volume2, VolumeX } from "lucide-react";
+import { ALargeSmall, Check, Download, Languages, Minus, RotateCcw, Smile, Undo2, Volume2, VolumeX } from "lucide-react";
 import FloatingDock from "@/components/FloatingDock";
 import IconButton from "@/components/IconButton";
 import IosInstallSheet from "@/components/IosInstallSheet";
+import Modal, { SheetHeader, SheetRow } from "@/components/Modal";
 import ReactionManagerSheet from "@/components/ReactionManagerSheet";
 import RoundSwitcher from "@/components/RoundSwitcher";
 import { useInstallAction } from "@/hooks/useInstallAction";
@@ -19,6 +20,8 @@ type VersusState = {
   names: Record<Side, string>;
   rounds: Scores[];
   currentRound: number;
+  /** When false, names disappear from the scoreboard and the announcements. */
+  showNames: boolean;
 };
 
 const STORAGE_KEY = "scoreKnobVersus";
@@ -29,6 +32,7 @@ const defaultState: VersusState = {
   names: { home: "Home", away: "Away" },
   rounds: [emptyScores()],
   currentRound: 0,
+  showNames: true,
 };
 
 const loadState = (): VersusState => {
@@ -42,6 +46,7 @@ const loadState = (): VersusState => {
       names: { ...defaultState.names, ...parsed.names },
       rounds,
       currentRound: Math.min(parsed.currentRound ?? 0, rounds.length - 1),
+      showNames: parsed.showNames ?? true,
     };
   } catch {
     return defaultState;
@@ -52,14 +57,28 @@ const loadState = (): VersusState => {
 const roundsWonBy = (side: Side, rounds: Scores[]) =>
   rounds.filter((round) => round[side] > round[side === "home" ? "away" : "home"]).length;
 
+const languageName = (lang: string) => {
+  if (lang === "auto") return "System default";
+  try {
+    const locale = navigator.language || "en";
+    const [primary, region] = lang.split("-");
+    const language = new Intl.DisplayNames([locale], { type: "language" }).of(primary) ?? primary;
+    const regionName = region ? new Intl.DisplayNames([locale], { type: "region" }).of(region) : undefined;
+    return `${language}${regionName ? ` (${regionName})` : ""}`;
+  } catch {
+    return lang;
+  }
+};
+
 const SidePanel: React.FC<{
   side: Side;
   name: string;
+  showName: boolean;
   score: number;
   onScore: () => void;
   onDecrement: () => void;
   onRename: (name: string) => void;
-}> = ({ side, name, score, onScore, onDecrement, onRename }) => {
+}> = ({ side, name, showName, score, onScore, onDecrement, onRename }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
 
@@ -80,46 +99,47 @@ const SidePanel: React.FC<{
           onScore();
         }
       }}
-      aria-label={`Add a point for ${name}`}
+      aria-label={showName ? `Add a point for ${name}` : "Add a point"}
       className={`relative flex-1 flex flex-col items-center justify-center gap-4 select-none transition-colors active:brightness-110 ${
         side === "home" ? "bg-primary/10" : "bg-muted"
       }`}
     >
-      {editing ? (
-        <input
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onClick={(e) => e.stopPropagation()}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commit();
-            if (e.key === "Escape") {
+      {showName &&
+        (editing ? (
+          <input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commit();
+              if (e.key === "Escape") {
+                setDraft(name);
+                setEditing(false);
+              }
+            }}
+            maxLength={20}
+            className="w-4/5 max-w-xs rounded-lg border bg-card px-3 py-2 text-center text-lg font-semibold"
+          />
+        ) : (
+          <span
+            onClick={(e) => {
+              e.stopPropagation();
               setDraft(name);
-              setEditing(false);
-            }
-          }}
-          maxLength={20}
-          className="w-4/5 max-w-xs rounded-lg border bg-card px-3 py-2 text-center text-lg font-semibold"
-        />
-      ) : (
-        <span
-          onClick={(e) => {
-            e.stopPropagation();
-            setDraft(name);
-            setEditing(true);
-          }}
-          className="text-lg font-semibold uppercase tracking-widest text-muted-foreground underline-offset-4 hover:underline"
-        >
-          {name}
-        </span>
-      )}
+              setEditing(true);
+            }}
+            className="text-lg font-semibold uppercase tracking-widest text-muted-foreground underline-offset-4 hover:underline"
+          >
+            {name}
+          </span>
+        ))}
 
       <span className="text-7xl sm:text-9xl font-bold tabular-nums text-foreground">{score}</span>
 
       <IconButton
         round
-        aria-label={`Remove a point from ${name}`}
+        aria-label={showName ? `Remove a point from ${name}` : "Remove a point"}
         onClick={(e) => {
           e.stopPropagation();
           onDecrement();
@@ -138,7 +158,16 @@ const Versus: React.FC = () => {
   const [showReactions, setShowReactions] = useState<boolean>(false);
   /** Undo stacks per round index, so switching rounds keeps each history intact. */
   const history = useRef<Record<number, Scores[]>>({});
-  const { enabled: speechOn, setEnabled: setSpeechOn, speak, supported: speechSupported } = useSpeech();
+  const {
+    enabled: speechOn,
+    setEnabled: setSpeechOn,
+    speak,
+    supported: speechSupported,
+    languages,
+    lang,
+    setLang,
+  } = useSpeech();
+  const [showLangSheet, setShowLangSheet] = useState(false);
   const { showInstallAction, showIosInstall, handleInstall, closeIosInstall } = useInstallAction();
 
   // Side-by-side scoring only fits in landscape; devices that reject the lock keep the portrait layout.
@@ -150,13 +179,18 @@ const Versus: React.FC = () => {
 
   useEffect(preloadReactions, []);
 
-  const { names, rounds, currentRound } = state;
+  const { names, rounds, currentRound, showNames } = state;
   const scores = rounds[currentRound];
 
   const setRound = (index: number, next: Scores) =>
     setState((prev) => ({ ...prev, rounds: prev.rounds.map((round, i) => (i === index ? next : round)) }));
 
-  const announce = (next: Scores) => speak(`${names.home} ${next.home}, ${names.away} ${next.away}`);
+  const announce = (next: Scores) =>
+    speak(
+      showNames
+        ? `${names.home} ${next.home}, ${names.away} ${next.away}`
+        : `${next.home}, ${next.away}`,
+    );
 
   const bump = (side: Side, delta: number) => {
     const stack = history.current[currentRound] ?? [];
@@ -209,6 +243,19 @@ const Versus: React.FC = () => {
               {speechOn ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
             </IconButton>
           )}
+          <IconButton
+            active={showNames}
+            onClick={() => setState((prev) => ({ ...prev, showNames: !prev.showNames }))}
+            aria-label={showNames ? "Hide team names" : "Show team names"}
+            aria-pressed={showNames}
+          >
+            <ALargeSmall className="w-5 h-5" />
+          </IconButton>
+          {speechSupported && (
+            <IconButton onClick={() => setShowLangSheet(true)} aria-label="Choose speech language">
+              <Languages className="w-5 h-5" />
+            </IconButton>
+          )}
           <IconButton onClick={undo} aria-label="Undo last change">
             <Undo2 className="w-5 h-5" />
           </IconButton>
@@ -229,6 +276,7 @@ const Versus: React.FC = () => {
             key={side}
             side={side}
             name={names[side]}
+            showName={showNames}
             score={scores[side]}
             onScore={() => bump(side, 1)}
             onDecrement={() => bump(side, -1)}
@@ -255,6 +303,45 @@ const Versus: React.FC = () => {
       />
 
       {showReactions && <ReactionManagerSheet onClose={() => setShowReactions(false)} />}
+
+      {showLangSheet && (
+        <Modal variant="bottom" onClose={() => setShowLangSheet(false)}>
+          <SheetHeader
+            title="Speech language"
+            description="Used when announcing the score."
+          />
+          <div className="overflow-y-auto max-h-[50vh]">
+            <SheetRow
+              active={lang === "auto"}
+              onClick={() => {
+                setLang("auto");
+                setShowLangSheet(false);
+              }}
+            >
+              <span className="flex-1 text-left">{languageName("auto")}</span>
+              {lang === "auto" && <Check className="w-5 h-5" />}
+            </SheetRow>
+            {languages.map((voiceLang) => (
+              <SheetRow
+                key={voiceLang}
+                active={lang === voiceLang}
+                onClick={() => {
+                  setLang(voiceLang);
+                  setShowLangSheet(false);
+                }}
+              >
+                <span className="flex-1 text-left">{languageName(voiceLang)}</span>
+                {lang === voiceLang && <Check className="w-5 h-5" />}
+              </SheetRow>
+            ))}
+            {languages.length === 0 && (
+              <div className="px-4 py-3 border-t text-sm text-muted-foreground">
+                No voices available yet — reloading the page may fix it.
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
 
       {showIosInstall && <IosInstallSheet appName="Diki Lab" onClose={closeIosInstall} />}
     </div>

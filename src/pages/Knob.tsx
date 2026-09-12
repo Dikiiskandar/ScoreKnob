@@ -222,7 +222,7 @@ const HIGHLIGHTS: HighlightConfig[] = [
     id: "first",
     label: "First rank",
     icon: Crown,
-    card: "bg-yellow-500/10 border-yellow-500/40",
+    card: "bg-yellow-500/50 border-yellow-500/80",
     accent: "text-yellow-600",
     value: (p) => p.score,
     display: (p) => String(p.score),
@@ -231,7 +231,7 @@ const HIGHLIGHTS: HighlightConfig[] = [
     id: "last",
     label: "Last rank",
     icon: ArrowDown,
-    card: "bg-red-500/10 border-red-500/40",
+    card: "bg-red-500/50 border-red-500/80",
     accent: "text-red-600",
     value: (p) => -p.score,
     display: (p) => String(p.score),
@@ -240,7 +240,7 @@ const HIGHLIGHTS: HighlightConfig[] = [
     id: "gain",
     label: "Biggest gain",
     icon: TrendingUp,
-    card: "bg-green-500/10 border-green-500/40",
+    card: "bg-green-500/50 border-green-500/80",
     accent: "text-green-600",
     value: (p) => p.score - p.previousScore,
     display: (p) => `+${p.score - p.previousScore}`,
@@ -249,7 +249,7 @@ const HIGHLIGHTS: HighlightConfig[] = [
     id: "drop",
     label: "Biggest drop",
     icon: TrendingDown,
-    card: "bg-orange-500/10 border-orange-500/40",
+    card: "bg-orange-500/50 border-orange-500/80",
     accent: "text-orange-600",
     value: (p) => p.previousScore - p.score,
     display: (p) => String(p.score - p.previousScore),
@@ -748,7 +748,7 @@ const KnobScoreboard: React.FC = () => {
               const rotationOffset = players.length === 4 ? Math.PI / 4 : 0;
               const angle = (index / players.length) * 2 * Math.PI - Math.PI / 2 + rotationOffset;
 
-              const LABEL_RADIUS = RADIUS + 40;
+              const LABEL_RADIUS = RADIUS + 75;
               const x = CENTER + LABEL_RADIUS * Math.cos(angle);
               const y = CENTER + LABEL_RADIUS * Math.sin(angle);
               const currentRank = finalRanks.find(r => r.id === player.id)?.rank ?? index;
@@ -760,7 +760,7 @@ const KnobScoreboard: React.FC = () => {
               return (
                 <div
                   key={player.id}
-                  className={`absolute w-[80px] text-center cursor-pointer select-none p-2 rounded-xl transition-all duration-200 ${
+                  className={`absolute w-[80px] text-center cursor-pointer select-none p-2 rounded-xl transition-all duration-200 z-10 ${
                     activePlayerId === player.id 
                       ? 'bg-primary text-primary-foreground shadow-2xl scale-110 ring-4 ring-primary/30 animate-pulse' 
                       : isHighlighted
@@ -808,15 +808,30 @@ const KnobScoreboard: React.FC = () => {
             });
           })()}
           {(() => {
+            const { player: highlightedPlayer } = getHighlight(players, highlightType);
+            if (!highlightedPlayer?.photo) return null;
+            return (
+              <img
+                src={highlightedPlayer.photo}
+                alt={highlightedPlayer.name}
+                className="absolute left-1/2 top-1/2 w-[320px] h-[320px] rounded-full object-cover pointer-events-none z-0"
+                style={{
+                  transform: `translate(-50%, -50%) rotate(${(rotationAngle * 180) / Math.PI}deg)`,
+                  transition: isDragging ? 'none' : 'transform 0.4s ease-out',
+                }}
+              />
+            );
+          })()}
+          {(() => {
             const hasPendingChanges = players.some(p => p.pendingScore !== p.score);
 
             return (
               <div
                 onClick={hasPendingChanges ? handleSubmit : undefined}
-                className={`absolute left-[50%] top-[50%] -translate-x-1/2 -translate-y-1/2 w-[100px] h-[100px] rounded-full flex items-center justify-center font-bold text-lg shadow-lg transition-all ${
+                className={`absolute left-[50%] top-[50%] -translate-x-1/2 -translate-y-1/2 w-[100px] h-[100px] rounded-full flex items-center justify-center font-bold text-lg shadow-lg transition-all duration-300 ${
                   hasPendingChanges
-                    ? 'bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90 hover:scale-105'
-                    : 'bg-muted text-muted-foreground cursor-not-allowed opacity-60'
+                    ? 'bg-primary text-primary-foreground cursor-pointer opacity-100 scale-100 pointer-events-auto hover:bg-primary/90 hover:scale-105'
+                    : 'bg-primary text-primary-foreground opacity-0 scale-75 pointer-events-none'
                 } ${isDragging && hasPendingChanges ? 'scale-110 shadow-2xl ring-4 ring-primary/50' : ''}`}
               >
                 Submit

@@ -9,16 +9,16 @@ import Versus from './pages/Versus'
 
 function App() {
   const location = useLocation();
-  const isFullscreenPage = ['/knob-page', '/versus'].includes(location.pathname);
+  const isFullscreenPage = ['/', '/knob-page', '/versus'].includes(location.pathname);
 
   useEffect(() => {
     const titles: Record<string, string> = {
-      '/': 'Diki Lab',
-      '/about': 'Diki Lab',
-      '/knob-page': 'Diki Lab: Knob Score',
-      '/versus': 'Diki Lab: Versus Score',
+      '/': 'ScoreKnob',
+      '/about': 'ScoreKnob: About',
+      '/knob-page': 'ScoreKnob: Knob Score',
+      '/versus': 'ScoreKnob: Versus Score',
     }
-    document.title = titles[location.pathname] ?? 'Diki Lab'
+    document.title = titles[location.pathname] ?? 'ScoreKnob'
   }, [location.pathname])
 
   return (

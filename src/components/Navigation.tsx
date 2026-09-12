@@ -8,9 +8,9 @@ const Navigation = () => {
   const { theme, toggleTheme } = useThemeStore();
 
   const navItems = [
-    { path: '/', label: 'Home' },
+    { path: '/', label: 'Menu' },
     { path: '/about', label: 'About' },
-    { path: '/knob-page', label: 'ScoreKnob' },
+    { path: '/knob-page', label: 'Knob' },
     { path: '/versus', label: 'Versus' },
   ];
 

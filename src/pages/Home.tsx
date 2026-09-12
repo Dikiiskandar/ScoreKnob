@@ -1,76 +1,94 @@
 import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { ArrowRight, RotateCw, Users } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { ChevronRight, Info, Moon, RotateCw, Sun, Users } from 'lucide-react';
+import IconButton from '@/components/IconButton';
+import { useThemeStore } from '@/store/useThemeStore';
+
+type MenuItem = {
+  to: string;
+  icon: LucideIcon;
+  label: string;
+  description: string;
+  /** "primary" for the main action, "card" for the secondary one. */
+  tone: 'primary' | 'card';
+};
+
+const GAME_MODES: MenuItem[] = [
+  {
+    to: '/knob-page',
+    icon: RotateCw,
+    label: 'Knob',
+    description: 'Spin the dial to score',
+    tone: 'primary',
+  },
+  {
+    to: '/versus',
+    icon: Users,
+    label: 'Versus',
+    description: 'Head-to-head match',
+    tone: 'card',
+  },
+];
+
+/** Big pressable card, like a level select in a game menu. */
+const MenuTile: React.FC<{ item: MenuItem }> = ({ item }) => {
+  const { to, icon: Icon, label, description, tone } = item;
+  return (
+    <Link
+      to={to}
+      className={`group w-full flex items-center gap-4 px-5 py-4 rounded-2xl border shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:scale-[0.98] ${
+        tone === 'primary'
+          ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+          : 'bg-card text-foreground hover:bg-accent'
+      }`}
+    >
+      <span
+        className={`size-12 rounded-xl flex items-center justify-center shrink-0 ${
+          tone === 'primary' ? 'bg-primary-foreground/15' : 'bg-primary/10 text-primary'
+        }`}
+      >
+        <Icon className="w-7 h-7" />
+      </span>
+      <span className="flex-1 text-left">
+        <span className="block text-xl font-bold leading-tight">{label}</span>
+        <span className={`block text-sm ${tone === 'primary' ? 'opacity-80' : 'text-muted-foreground'}`}>
+          {description}
+        </span>
+      </span>
+      <ChevronRight className="w-6 h-6 opacity-60 transition-transform group-hover:translate-x-0.5" />
+    </Link>
+  );
+};
 
 const Home = () => {
+  const { theme, toggleTheme } = useThemeStore();
+
   return (
-    <div className="min-h-screen flex flex-col">
-      <section className="flex-1 flex items-center justify-center px-4 py-20">
-        <div className="max-w-4xl mx-auto text-center space-y-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
-            <RotateCw className="w-4 h-4" />
-            Interactive Score Tracking
-          </div>
+    <div className="relative min-h-[100dvh] flex flex-col items-center justify-center gap-10 px-6 py-16 pb-[calc(4rem+var(--safe-bottom))]">
+      <div className="absolute right-4 top-[calc(1rem+var(--safe-top))]">
+        <IconButton onClick={toggleTheme} aria-label="Toggle theme">
+          {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+        </IconButton>
+      </div>
 
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-foreground drop-shadow-sm">
-            ScoreKnob
-          </h1>
+      <div className="flex flex-col items-center text-center space-y-4">
+        <img src="./logo.svg" alt="ScoreKnob" className="w-20 h-20 rounded-3xl shadow-lg" />
+        <h1 className="text-5xl md:text-6xl font-black tracking-tight drop-shadow-sm">ScoreKnob</h1>
+        <p className="text-lg text-muted-foreground">Pick a mode to start scoring.</p>
+      </div>
 
-          <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            A simple way to keep score. Use the knob for one-tap scoring, or switch to Versus for head-to-head matches.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-            <Button size="lg" asChild className="text-lg px-8 shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
-              <Link to="/knob-page">
-                Open Knob
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild className="text-lg px-8 hover:-translate-y-0.5 transition-all">
-              <Link to="/versus">
-                <Users className="mr-2 w-5 h-5" />
-                Start Versus
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-t bg-muted/30 py-16 px-4">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Ways to Score</h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-card border rounded-2xl shadow-sm p-6 text-center space-y-4 hover:shadow-md transition-all hover:-translate-y-1">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center">
-                <RotateCw className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="text-xl font-semibold">Rotary Knob</h3>
-              <p className="text-muted-foreground">
-                Spin the dial to add or remove points in a single, intuitive motion
-              </p>
-            </div>
-            <div className="bg-card border rounded-2xl shadow-sm p-6 text-center space-y-4 hover:shadow-md transition-all hover:-translate-y-1">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center">
-                <Users className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="text-xl font-semibold">Head-to-Head</h3>
-              <p className="text-muted-foreground">
-                Track two scores side by side for quick duels and 1v1 games
-              </p>
-            </div>
-            <div className="bg-card border rounded-2xl shadow-sm p-6 text-center space-y-4 hover:shadow-md transition-all hover:-translate-y-1">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center">
-                <RotateCw className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="text-xl font-semibold">Works Anywhere</h3>
-              <p className="text-muted-foreground">
-                Built for desktop and mobile, so you can score on the go
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+      <nav className="w-full max-w-sm space-y-4">
+        {GAME_MODES.map((item) => (
+          <MenuTile key={item.to} item={item} />
+        ))}
+        <Link
+          to="/about"
+          className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-sm font-medium text-muted-foreground hover:bg-accent transition-colors"
+        >
+          <Info className="w-4 h-4" />
+          About
+        </Link>
+      </nav>
     </div>
   );
 };

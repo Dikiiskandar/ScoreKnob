@@ -1,9 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Download, Frown, Hand, Laugh, Minus, Plus, RotateCcw, Share, Smile, Undo2, Volume2, VolumeX } from "lucide-react";
+import { Download, Frown, Hand, Laugh, Minus, RotateCcw, Smile, Undo2, Volume2, VolumeX } from "lucide-react";
 import FloatingDock, { type DockItem } from "@/components/FloatingDock";
+import IconButton from "@/components/IconButton";
+import IosInstallSheet from "@/components/IosInstallSheet";
+import RoundSwitcher from "@/components/RoundSwitcher";
+import { useInstallAction } from "@/hooks/useInstallAction";
 import { useOrientationLock } from "@/hooks/useOrientationLock";
 import { useSpeech } from "@/hooks/useSpeech";
-import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { playReaction, preloadReactions } from "@/lib/reactions";
 
 type Side = "home" | "away";
@@ -117,45 +120,27 @@ const SidePanel: React.FC<{
 
       <span className="text-7xl sm:text-9xl font-bold tabular-nums text-foreground">{score}</span>
 
-      <span
-        role="button"
-        tabIndex={0}
+      <IconButton
+        round
         aria-label={`Remove a point from ${name}`}
         onClick={(e) => {
           e.stopPropagation();
           onDecrement();
         }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.stopPropagation();
-            e.preventDefault();
-            onDecrement();
-          }
-        }}
-        className="rounded-full border bg-card p-3 text-muted-foreground shadow-sm transition-colors hover:bg-accent"
+        className="size-11 border bg-card shadow-sm"
       >
         <Minus className="w-5 h-5" />
-      </span>
+      </IconButton>
     </div>
   );
 };
 
 const Versus: React.FC = () => {
   const [state, setState] = useState<VersusState>(loadState);
-  const [showIosInstall, setShowIosInstall] = useState<boolean>(false);
   /** Undo stacks per round index, so switching rounds keeps each history intact. */
   const history = useRef<Record<number, Scores[]>>({});
   const { enabled: speechOn, setEnabled: setSpeechOn, speak, supported: speechSupported } = useSpeech();
-  const { canInstall, needsIosInstructions, isInstalled, promptInstall } = usePwaInstall();
-  const showInstallAction = !isInstalled && (canInstall || needsIosInstructions);
-
-  const handleInstall = () => {
-    if (canInstall) {
-      void promptInstall();
-      return;
-    }
-    setShowIosInstall(true);
-  };
+  const { showInstallAction, showIosInstall, handleInstall, closeIosInstall } = useInstallAction();
 
   // Side-by-side scoring only fits in landscape; devices that reject the lock keep the portrait layout.
   useOrientationLock("landscape");
@@ -209,7 +194,8 @@ const Versus: React.FC = () => {
         </div>
         <div className="flex items-center gap-1">
           {speechSupported && (
-            <button
+            <IconButton
+              active={speechOn}
               onClick={() => {
                 const next = !speechOn;
                 setSpeechOn(next);
@@ -218,33 +204,20 @@ const Versus: React.FC = () => {
               }}
               aria-label={speechOn ? "Turn off score announcements" : "Announce the score out loud"}
               aria-pressed={speechOn}
-              className={`rounded-lg p-2 hover:bg-accent ${speechOn ? "text-primary" : "text-muted-foreground"}`}
             >
               {speechOn ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
-            </button>
+            </IconButton>
           )}
-          <button
-            onClick={undo}
-            aria-label="Undo last change"
-            className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
-          >
+          <IconButton onClick={undo} aria-label="Undo last change">
             <Undo2 className="w-5 h-5" />
-          </button>
-          <button
-            onClick={resetAll}
-            aria-label="Reset all rounds"
-            className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
-          >
+          </IconButton>
+          <IconButton onClick={resetAll} aria-label="Reset all rounds">
             <RotateCcw className="w-5 h-5" />
-          </button>
+          </IconButton>
           {showInstallAction && (
-            <button
-              onClick={handleInstall}
-              aria-label="Install app"
-              className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
-            >
+            <IconButton onClick={handleInstall} aria-label="Install app">
               <Download className="w-5 h-5" />
-            </button>
+            </IconButton>
           )}
         </div>
       </div>
@@ -262,69 +235,19 @@ const Versus: React.FC = () => {
           />
         ))}
 
-        <div className="absolute bottom-[calc(1rem+var(--safe-bottom))] left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 max-w-[50vw] overflow-x-auto rounded-full bg-card/90 px-3 py-2 shadow-2xl backdrop-blur-md">
-          {rounds.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setState((prev) => ({ ...prev, currentRound: index }))}
-              aria-label={`Round ${index + 1}`}
-              aria-current={currentRound === index}
-              className={`w-10 h-10 flex-shrink-0 rounded-full text-sm font-bold transition-all ${
-                currentRound === index
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-foreground hover:bg-accent"
-              }`}
-            >
-              {index + 1}
-            </button>
-          ))}
-          <button
-            onClick={addRound}
-            aria-label="Add round"
-            className="w-10 h-10 flex-shrink-0 rounded-full bg-muted text-foreground hover:bg-accent flex items-center justify-center"
-          >
-            <Plus className="w-5 h-5" />
-          </button>
-        </div>
+        <RoundSwitcher
+          count={rounds.length}
+          current={currentRound}
+          position="absolute"
+          maxWidth="max-w-[50vw]"
+          onSelect={(index) => setState((prev) => ({ ...prev, currentRound: index }))}
+          onAdd={addRound}
+        />
       </div>
 
       <FloatingDock items={REACTIONS} icon={Smile} label="Reactions" storageKey="scoreKnobReactionDock" />
 
-      {/* Add to Home Screen (iOS) */}
-      {showIosInstall && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pt-[calc(1rem+var(--safe-top))]">
-          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-            <h2 className="text-xl font-bold">Add to Home Screen</h2>
-            <p className="text-sm text-muted-foreground">
-              Install Diki Lab to play offline with a full-screen app icon.
-            </p>
-            <ol className="space-y-3 text-sm">
-              <li className="flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center font-bold text-xs">1</span>
-                <span className="flex items-center gap-1">
-                  Tap the <Share className="w-4 h-4 inline" /> Share button in Safari
-                </span>
-              </li>
-              <li className="flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center font-bold text-xs">2</span>
-                <span className="flex items-center gap-1">
-                  Choose <Plus className="w-4 h-4 inline" /> Add to Home Screen
-                </span>
-              </li>
-              <li className="flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center font-bold text-xs">3</span>
-                <span>Tap Add to confirm</span>
-              </li>
-            </ol>
-            <button
-              onClick={() => setShowIosInstall(false)}
-              className="w-full px-4 py-2 bg-muted text-foreground rounded-md hover:bg-accent transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+      {showIosInstall && <IosInstallSheet appName="Diki Lab" onClose={closeIosInstall} />}
     </div>
   );
 };

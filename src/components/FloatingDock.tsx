@@ -151,7 +151,7 @@ const FloatingDock: React.FC<{
         aria-expanded={open}
         // Stops the browser from scrolling or long-press-selecting mid-drag.
         style={{ touchAction: "none" }}
-        className={`w-full h-full rounded-full bg-card/80 shadow-2xl backdrop-blur-md flex items-center justify-center transition-opacity ${
+        className={`w-full h-full rounded-full bg-card/80 border shadow-2xl backdrop-blur-md flex items-center justify-center transition-opacity ${
           open || drag ? "opacity-100" : "opacity-60 hover:opacity-100"
         }`}
       >
@@ -160,7 +160,7 @@ const FloatingDock: React.FC<{
 
       {open && (
         <div
-          className={`absolute top-0 flex items-center gap-2 rounded-full bg-card/90 p-2 shadow-2xl backdrop-blur-md ${
+          className={`absolute top-0 flex items-center gap-2 rounded-full bg-card/90 border p-2 shadow-2xl backdrop-blur-md ${
             placement.side === "left" ? "left-[calc(100%+0.5rem)]" : "right-[calc(100%+0.5rem)]"
           }`}
         >

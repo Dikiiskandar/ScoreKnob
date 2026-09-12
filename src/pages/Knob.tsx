@@ -1,11 +1,15 @@
 import React, { useRef, useState, useEffect } from "react";
-import { RotateCw, RotateCcw, Plus, Trash2, Edit2, X, Trophy, Medal, Download, WifiOff, Share, Camera, Crown, TrendingDown, TrendingUp, ChevronsUpDown, ArrowDown, Image as ImageIcon, Mic, Square, Play, Volume2, Frown, Hand, Laugh, Smile } from "lucide-react";
+import { RotateCw, RotateCcw, Plus, Trash2, Edit2, X, Trophy, Medal, Download, WifiOff, Camera, Crown, TrendingDown, TrendingUp, ChevronsUpDown, ArrowDown, Image as ImageIcon, Mic, Square, Play, Volume2, Frown, Hand, Laugh, Smile } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { usePwaInstall } from "@/hooks/usePwaInstall";
+import { useInstallAction } from "@/hooks/useInstallAction";
 import { useVoiceRecorder, canRecordVoice, recordUnavailableReason, MAX_VOICE_MS } from "@/hooks/useVoiceRecorder";
 import { fileToSquareDataUrl } from "@/lib/image";
 import { fileToDataUrl } from "@/lib/file";
 import FloatingDock, { type DockItem } from "@/components/FloatingDock";
+import IconButton from "@/components/IconButton";
+import IosInstallSheet from "@/components/IosInstallSheet";
+import Modal, { SheetHeader, SheetRow } from "@/components/Modal";
+import RoundSwitcher from "@/components/RoundSwitcher";
 import { playReaction, preloadReactions } from "@/lib/reactions";
 
 type Player = {
@@ -63,47 +67,33 @@ const PhotoSourceSheet: React.FC<{
   onRemove?: () => void;
   onClose: () => void;
 }> = ({ onFile, onRemove, onClose }) => (
-  <div
-    onClick={onClose}
-    className="fixed inset-0 z-[60] bg-black/50 flex items-end sm:items-center justify-center p-4 pb-[calc(1rem+var(--safe-bottom))]"
-  >
-    <div
-      onClick={(e) => e.stopPropagation()}
-      className="w-full max-w-sm bg-card rounded-2xl shadow-2xl overflow-hidden"
+  <Modal variant="bottom" maxWidth="max-w-sm" backdropClassName="z-[60]" onClose={onClose}>
+    <SheetHeader title="Player photo" />
+    <MediaInput
+      capture="environment"
+      onFile={(file) => { onClose(); onFile(file); }}
+      className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors"
     >
-      <div className="px-4 py-3 border-b font-semibold">Player photo</div>
-      <MediaInput
-        capture="environment"
-        onFile={(file) => { onClose(); onFile(file); }}
-        className="flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors"
-      >
-        <Camera className="w-5 h-5 text-primary" />
-        Take a photo
-      </MediaInput>
-      <MediaInput
-        onFile={(file) => { onClose(); onFile(file); }}
-        className="flex items-center gap-3 px-4 py-3 border-t hover:bg-accent transition-colors"
-      >
-        <ImageIcon className="w-5 h-5 text-primary" />
-        Choose from files
-      </MediaInput>
-      {onRemove && (
-        <button
-          onClick={() => { onClose(); onRemove(); }}
-          className="w-full flex items-center gap-3 px-4 py-3 border-t text-red-600 hover:bg-red-600/10 transition-colors"
-        >
-          <Trash2 className="w-5 h-5" />
-          Remove photo
-        </button>
-      )}
-      <button
-        onClick={onClose}
-        className="w-full px-4 py-3 border-t text-muted-foreground hover:bg-accent transition-colors"
-      >
-        Cancel
-      </button>
-    </div>
-  </div>
+      <Camera className="w-5 h-5 text-primary" />
+      Take a photo
+    </MediaInput>
+    <MediaInput
+      onFile={(file) => { onClose(); onFile(file); }}
+      className="flex items-center gap-3 px-4 py-3 border-t hover:bg-accent transition-colors"
+    >
+      <ImageIcon className="w-5 h-5 text-primary" />
+      Choose from files
+    </MediaInput>
+    {onRemove && (
+      <SheetRow danger onClick={() => { onClose(); onRemove(); }}>
+        <Trash2 className="w-5 h-5" />
+        Remove photo
+      </SheetRow>
+    )}
+    <SheetRow onClick={onClose} className="text-muted-foreground">
+      Cancel
+    </SheetRow>
+  </Modal>
 );
 
 /** Record, preview or clear the clip that plays when a player gets highlighted. */
@@ -120,87 +110,60 @@ const VoiceSheet: React.FC<{
   onRemove: () => void;
   onClose: () => void;
 }> = ({ player, isRecording, isPlaying, elapsedMs, onStart, onStop, onPlay, onStopPlay, onFile, onRemove, onClose }) => (
-  <div
-    onClick={isRecording ? undefined : onClose}
-    className="fixed inset-0 z-[60] bg-black/50 flex items-end sm:items-center justify-center p-4 pb-[calc(1rem+var(--safe-bottom))]"
-  >
-    <div
-      onClick={(e) => e.stopPropagation()}
-      className="w-full max-w-sm bg-card rounded-2xl shadow-2xl overflow-hidden"
-    >
-      <div className="px-4 py-3 border-b">
-        <div className="font-semibold">Voice for {player.name}</div>
-        <div className="text-xs text-muted-foreground">
-          Plays automatically when this player is highlighted after a submit (max {MAX_VOICE_MS / 1000}s).
-        </div>
-      </div>
-      {isRecording ? (
-        <button
-          onClick={onStop}
-          className="w-full flex items-center gap-3 px-4 py-3 bg-red-600/10 text-red-600 hover:bg-red-600/20 transition-colors"
-        >
-          <Square className="w-5 h-5" />
-          <span className="flex-1 text-left">Stop recording</span>
-          <span className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
-            <span className="font-mono text-sm tabular-nums">
-              {(elapsedMs / 1000).toFixed(1)}s / {MAX_VOICE_MS / 1000}s
-            </span>
+  <Modal variant="bottom" maxWidth="max-w-sm" backdropClassName="z-[60]" onClose={isRecording ? undefined : onClose}>
+    <SheetHeader
+      title={`Voice for ${player.name}`}
+      description={`Plays automatically when this player is highlighted after a submit (max ${MAX_VOICE_MS / 1000}s).`}
+    />
+    {isRecording ? (
+      <SheetRow onClick={onStop} className="bg-red-600/10 text-red-600 hover:bg-red-600/20">
+        <Square className="w-5 h-5" />
+        <span className="flex-1 text-left">Stop recording</span>
+        <span className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+          <span className="font-mono text-sm tabular-nums">
+            {(elapsedMs / 1000).toFixed(1)}s / {MAX_VOICE_MS / 1000}s
           </span>
-        </button>
-      ) : canRecordVoice() ? (
-        <button
-          onClick={onStart}
-          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors"
-        >
-          <Mic className="w-5 h-5 text-primary" />
-          {player.voice ? 'Record again' : 'Start recording'}
-        </button>
-      ) : (
-        <div className="flex items-start gap-3 px-4 py-3 text-xs text-muted-foreground">
-          <Mic className="w-5 h-5 flex-shrink-0 opacity-50" />
-          <span>{recordUnavailableReason()} You can still pick a sound file below.</span>
-        </div>
-      )}
-      {!isRecording && (
-        <MediaInput
-          accept="audio/*"
-          onFile={onFile}
-          className="flex items-center gap-3 px-4 py-3 border-t hover:bg-accent transition-colors"
-        >
-          <Volume2 className="w-5 h-5 text-primary" />
-          {player.voice ? 'Replace with a sound file' : 'Choose a sound file'}
-        </MediaInput>
-      )}
-      {player.voice && !isRecording && (
-        <>
-          <button
-            onClick={isPlaying ? onStopPlay : onPlay}
-            className={`w-full flex items-center gap-3 px-4 py-3 border-t transition-colors ${
-              isPlaying ? 'bg-primary/10 hover:bg-primary/20' : 'hover:bg-accent'
-            }`}
-          >
-            {isPlaying ? <Square className="w-5 h-5 text-primary" /> : <Play className="w-5 h-5 text-primary" />}
-            <span className="flex-1 text-left">{isPlaying ? 'Playing…' : 'Play back'}</span>
-            {isPlaying && <Volume2 className="w-4 h-4 text-primary animate-pulse" />}
-          </button>
-          <button
-            onClick={() => { onClose(); onRemove(); }}
-            className="w-full flex items-center gap-3 px-4 py-3 border-t text-red-600 hover:bg-red-600/10 transition-colors"
-          >
-            <Trash2 className="w-5 h-5" />
-            Remove voice
-          </button>
-        </>
-      )}
-      <button
-        onClick={isRecording ? onStop : onClose}
-        className="w-full px-4 py-3 border-t text-muted-foreground hover:bg-accent transition-colors"
+        </span>
+      </SheetRow>
+    ) : canRecordVoice() ? (
+      <SheetRow onClick={onStart} className="border-t-0">
+        <Mic className="w-5 h-5 text-primary" />
+        {player.voice ? 'Record again' : 'Start recording'}
+      </SheetRow>
+    ) : (
+      <div className="flex items-start gap-3 px-4 py-3 text-xs text-muted-foreground">
+        <Mic className="w-5 h-5 flex-shrink-0 opacity-50" />
+        <span>{recordUnavailableReason()} You can still pick a sound file below.</span>
+      </div>
+    )}
+    {!isRecording && (
+      <MediaInput
+        accept="audio/*"
+        onFile={onFile}
+        className="flex items-center gap-3 px-4 py-3 border-t hover:bg-accent transition-colors"
       >
-        {isRecording ? 'Stop' : 'Close'}
-      </button>
-    </div>
-  </div>
+        <Volume2 className="w-5 h-5 text-primary" />
+        {player.voice ? 'Replace with a sound file' : 'Choose a sound file'}
+      </MediaInput>
+    )}
+    {player.voice && !isRecording && (
+      <>
+        <SheetRow active={isPlaying} onClick={isPlaying ? onStopPlay : onPlay}>
+          {isPlaying ? <Square className="w-5 h-5 text-primary" /> : <Play className="w-5 h-5 text-primary" />}
+          <span className="flex-1 text-left">{isPlaying ? 'Playing…' : 'Play back'}</span>
+          {isPlaying && <Volume2 className="w-4 h-4 text-primary animate-pulse" />}
+        </SheetRow>
+        <SheetRow danger onClick={() => { onClose(); onRemove(); }}>
+          <Trash2 className="w-5 h-5" />
+          Remove voice
+        </SheetRow>
+      </>
+    )}
+    <SheetRow onClick={isRecording ? onStop : onClose} className="text-muted-foreground">
+      {isRecording ? 'Stop' : 'Close'}
+    </SheetRow>
+  </Modal>
 );
 
 type HighlightType = "first" | "last" | "gain" | "drop";
@@ -324,7 +287,6 @@ const KnobScoreboard: React.FC = () => {
   const [newPlayerName, setNewPlayerName] = useState<string>("");
   const [editingPlayerId, setEditingPlayerId] = useState<number | null>(null);
   const [editingPlayerName, setEditingPlayerName] = useState<string>("");
-  const [showIosInstall, setShowIosInstall] = useState<boolean>(false);
   const [newPlayerPhoto, setNewPlayerPhoto] = useState<string | undefined>(undefined);
   const [photoError, setPhotoError] = useState<string>("");
   const [photoMenuFor, setPhotoMenuFor] = useState<number | "new" | null>(null);
@@ -377,16 +339,7 @@ const KnobScoreboard: React.FC = () => {
   ];
   useEffect(preloadReactions, []);
 
-  const { canInstall, needsIosInstructions, isInstalled, isOffline, promptInstall } = usePwaInstall();
-  const showInstallAction = !isInstalled && (canInstall || needsIosInstructions);
-
-  const handleInstall = () => {
-    if (canInstall) {
-      void promptInstall();
-      return;
-    }
-    setShowIosInstall(true);
-  };
+  const { showInstallAction, showIosInstall, handleInstall, closeIosInstall, isOffline } = useInstallAction();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -615,6 +568,11 @@ const KnobScoreboard: React.FC = () => {
     }
   };
 
+  const addRound = () => {
+    setRounds(prev => [...prev, prev[currentRound].map(p => ({ ...p, score: 0, previousScore: 0, previousRank: -1, pendingScore: 0 }))]);
+    setCurrentRound(rounds.length);
+  };
+
   const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
   const highlightBadges = getHighlightBadges(players);
 
@@ -669,28 +627,16 @@ const KnobScoreboard: React.FC = () => {
           >
             {multiplier}x
           </button>
-          <button
-            onClick={() => setShowPlayerManager(true)}
-            aria-label="Add player"
-            className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
-          >
+          <IconButton onClick={() => setShowPlayerManager(true)} aria-label="Add player">
             <Plus className="w-5 h-5" />
-          </button>
-          <button
-            onClick={resetAllData}
-            aria-label="Reset all"
-            className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
-          >
+          </IconButton>
+          <IconButton onClick={resetAllData} aria-label="Reset all">
             <RotateCcw className="w-5 h-5" />
-          </button>
+          </IconButton>
           {showInstallAction && (
-            <button
-              onClick={handleInstall}
-              aria-label="Install app"
-              className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
-            >
+            <IconButton onClick={handleInstall} aria-label="Install app">
               <Download className="w-5 h-5" />
-            </button>
+            </IconButton>
           )}
         </div>
       </div>
@@ -871,10 +817,11 @@ const KnobScoreboard: React.FC = () => {
       </div>
 
       {/* Leaderboard Toggle */}
-      <div className="fixed bottom-4 left-4">
+      <div className="fixed bottom-4 left-4 z-40">
         <button
           onClick={() => setShowLeaderboard(!showLeaderboard)}
-          className="w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center"
+          aria-label="Toggle leaderboard"
+          className="size-14 rounded-full bg-primary text-primary-foreground shadow-2xl hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center"
         >
           <Trophy className="w-6 h-6" />
         </button>
@@ -882,8 +829,7 @@ const KnobScoreboard: React.FC = () => {
       
       {/* Player Management Panel */}
       {showPlayerManager && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pt-[calc(1rem+var(--safe-top))]">
-          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
+        <Modal className="max-h-[80vh] flex flex-col">
             <div className="p-6 border-b">
               <h2 className="text-xl font-bold">Manage Players</h2>
             </div>
@@ -948,18 +894,16 @@ const KnobScoreboard: React.FC = () => {
                         className="flex-1 px-2 py-1 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                         autoFocus
                       />
-                      <button
+                      <IconButton
                         onClick={savePlayerName}
-                        className="p-2 text-green-600 hover:bg-green-600/10 rounded-md transition-colors"
+                        aria-label="Save player name"
+                        className="size-9 text-green-600 hover:bg-green-600/10"
                       >
                         <RotateCw className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={cancelEditing}
-                        className="p-2 text-red-600 hover:bg-red-600/10 rounded-md transition-colors"
-                      >
+                      </IconButton>
+                      <IconButton danger onClick={cancelEditing} aria-label="Cancel editing" className="size-9">
                         <X className="w-4 h-4" />
-                      </button>
+                      </IconButton>
                     </>
                   ) : (
                     <>
@@ -999,17 +943,21 @@ const KnobScoreboard: React.FC = () => {
                         </div>
                         <div className="text-sm text-muted-foreground">Score: {player.score}</div>
                       </div>
-                      <button
+                      <IconButton
                         onClick={() => setVoiceMenuFor(player.id)}
                         title={player.voice ? "Change voice" : "Record voice"}
-                        className={`p-2 rounded-md transition-colors ${
+                        aria-label={player.voice ? "Change voice" : "Record voice"}
+                        danger={recordingFor === player.id}
+                        className={
                           recordingFor === player.id
-                            ? 'text-red-600 bg-red-600/10 animate-pulse'
-                            : player.voice ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:bg-accent'
-                        }`}
+                            ? "size-9 bg-red-600/10 animate-pulse"
+                            : player.voice
+                              ? "size-9 text-primary hover:bg-primary/10"
+                              : "size-9"
+                        }
                       >
                         <Mic className="w-4 h-4" />
-                      </button>
+                      </IconButton>
                       {voiceMenuFor === player.id && (
                         <VoiceSheet
                           player={player}
@@ -1025,18 +973,16 @@ const KnobScoreboard: React.FC = () => {
                           onClose={() => setVoiceMenuFor(null)}
                         />
                       )}
-                      <button
+                      <IconButton
                         onClick={() => startEditingPlayer(player)}
-                        className="p-2 text-primary hover:bg-primary/10 rounded-md transition-colors"
+                        aria-label={`Rename ${player.name}`}
+                        className="size-9 text-primary hover:bg-primary/10"
                       >
                         <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => deletePlayer(player.id)}
-                        className="p-2 text-red-600 hover:bg-red-600/10 rounded-md transition-colors"
-                      >
+                      </IconButton>
+                      <IconButton danger onClick={() => deletePlayer(player.id)} aria-label={`Delete ${player.name}`} className="size-9">
                         <Trash2 className="w-4 h-4" />
-                      </button>
+                      </IconButton>
                     </>
                   )}
                 </div>
@@ -1051,14 +997,12 @@ const KnobScoreboard: React.FC = () => {
                 Close
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Leaderboard Panel */}
       {showLeaderboard && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pt-[calc(1rem+var(--safe-top))]">
-          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
+        <Modal className="max-h-[80vh] flex flex-col">
             <div className="p-6 border-b">
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <Trophy className="w-6 h-6 text-yellow-500" />
@@ -1114,17 +1058,19 @@ const KnobScoreboard: React.FC = () => {
                     )}
                   </div>
                   {player.voice && (
-                    <button
+                    <IconButton
+                      round
                       onClick={() => playingFor === player.id ? stopVoice() : playVoice(player)}
                       title={playingFor === player.id ? "Stop voice" : "Play voice"}
-                      className={`w-9 h-9 flex-shrink-0 rounded-full flex items-center justify-center transition-colors ${
+                      aria-label={playingFor === player.id ? "Stop voice" : `Play ${player.name}'s voice`}
+                      className={`size-9 flex-shrink-0 ${
                         playingFor === player.id
-                          ? 'bg-primary text-primary-foreground animate-pulse'
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90 animate-pulse'
                           : 'bg-primary/10 text-primary hover:bg-primary/20'
                       }`}
                     >
                       {playingFor === player.id ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                    </button>
+                    </IconButton>
                   )}
                 </div>
               );
@@ -1144,68 +1090,16 @@ const KnobScoreboard: React.FC = () => {
                 Close
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
-      {/* Add to Home Screen (iOS) */}
-      {showIosInstall && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pt-[calc(1rem+var(--safe-top))]">
-          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-            <h2 className="text-xl font-bold">Add to Home Screen</h2>
-            <p className="text-sm text-muted-foreground">
-              Install ScoreKnob to play offline with a full-screen app icon.
-            </p>
-            <ol className="space-y-3 text-sm">
-              <li className="flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center font-bold text-xs">1</span>
-                <span className="flex items-center gap-1">
-                  Tap the <Share className="w-4 h-4 inline" /> Share button in Safari
-                </span>
-              </li>
-              <li className="flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center font-bold text-xs">2</span>
-                <span className="flex items-center gap-1">
-                  Choose <Plus className="w-4 h-4 inline" /> Add to Home Screen
-                </span>
-              </li>
-              <li className="flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center font-bold text-xs">3</span>
-                <span>Tap Add to confirm</span>
-              </li>
-            </ol>
-            <button
-              onClick={() => setShowIosInstall(false)}
-              className="w-full px-4 py-2 bg-muted text-foreground rounded-md hover:bg-accent transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+      {showIosInstall && <IosInstallSheet onClose={closeIosInstall} />}
 
-      {/* Round Switcher */}
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-2 bg-card/90 backdrop-blur-md rounded-full shadow-2xl max-w-[calc(100vw-170px)] overflow-x-auto z-40">
-        {rounds.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => setCurrentRound(index)}
-            className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all flex-shrink-0 ${
-              currentRound === index ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-accent'
-            }`}
-          >
-            {index + 1}
-          </button>
-        ))}
-        <button
-          onClick={() => {
-            setRounds(prev => [...prev, prev[currentRound].map(p => ({ ...p, score: 0, previousScore: 0, previousRank: -1, pendingScore: 0 }))]);
-            setCurrentRound(rounds.length);
-          }}
-          className="w-10 h-10 rounded-full bg-muted text-foreground hover:bg-accent flex items-center justify-center text-sm font-bold flex-shrink-0"
-        >
-          +
-        </button>
-      </div>
+      <RoundSwitcher
+        count={rounds.length}
+        current={currentRound}
+        onSelect={setCurrentRound}
+        onAdd={addRound}
+      />
 
       <FloatingDock items={REACTIONS} icon={Smile} label="Reactions" storageKey="scoreKnobReactionDockKnob" />
     </div>

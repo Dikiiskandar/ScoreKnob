@@ -21,13 +21,18 @@ type Draft = {
   sound?: string;
 };
 
-/** Vertical drag state while sorting reactions inside one custom group. */
+/** Vertical drag state while sorting; hovering another group's rows moves there. */
 type Drag = {
-  groupId: string;
+  reactionId: string;
   pointerId: number;
   startY: number;
+  fromGroupId: string;
   from: number;
+  /** Same-group target index; only meaningful while toGroupId === fromGroupId. */
   to: number;
+  toGroupId: string;
+  /** Insertion slot inside the target group while dragging across groups. */
+  slot: number;
   dy: number;
   rowH: number;
   count: number;
@@ -54,7 +59,7 @@ const IconTile: React.FC<{ iconKey?: string; label: string }> = ({ iconKey, labe
  * order, and move them between groups.
  */
 const ReactionManagerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { customs, groups, add, update, remove, move, addGroup, renameGroup, removeGroup } =
+  const { customs, groups, add, update, remove, move, relocate, addGroup, renameGroup, removeGroup } =
     useReactionStore();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState("");
@@ -66,6 +71,7 @@ const ReactionManagerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) =>
 
   const startDrag = (
     event: React.PointerEvent<HTMLButtonElement>,
+    reactionId: string,
     groupId: string,
     index: number,
     count: number,
@@ -75,11 +81,14 @@ const ReactionManagerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) =>
     const rowH = row?.offsetHeight || 61;
     handle.setPointerCapture(event.pointerId);
     setDrag({
-      groupId,
+      reactionId,
       pointerId: event.pointerId,
       startY: event.clientY,
+      fromGroupId: groupId,
       from: index,
       to: index,
+      toGroupId: groupId,
+      slot: index,
       dy: 0,
       rowH,
       count,
@@ -87,28 +96,71 @@ const ReactionManagerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) =>
   };
 
   const updateDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    // Rows translate while sorting, so hit-test against the live DOM instead
+    // of relying on React state.
+    const hovered = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLElement>("[data-drop-group]");
     setDrag((prev) => {
       if (!prev || prev.pointerId !== event.pointerId) return prev;
-      const dy = Math.min(
-        Math.max(event.clientY - prev.startY, -prev.from * prev.rowH),
-        (prev.count - 1 - prev.from) * prev.rowH,
-      );
-      return { ...prev, dy, to: prev.from + Math.round(dy / prev.rowH) };
+      const dy = event.clientY - prev.startY;
+      const zoneId = hovered?.dataset.dropGroup;
+      if (!zoneId || zoneId === prev.fromGroupId) {
+        // Same group (or outside any zone): clamp the travel to its bounds.
+        const clampedDy = Math.min(
+          Math.max(dy, -prev.from * prev.rowH),
+          (prev.count - 1 - prev.from) * prev.rowH,
+        );
+        return {
+          ...prev,
+          dy: clampedDy,
+          toGroupId: prev.fromGroupId,
+          to: prev.from + Math.round(clampedDy / prev.rowH),
+          slot: prev.from,
+        };
+      }
+      // Crossing into another group: insert before the row under the pointer.
+      const rows = Array.from(hovered.querySelectorAll<HTMLElement>("[data-reaction-row]"));
+      let slot = rows.length;
+      for (const row of rows) {
+        const rect = row.getBoundingClientRect();
+        // Undo the shift already applied while hovering so midpoints stay stable.
+        const shifted =
+          prev.toGroupId === zoneId && Number(row.dataset.index) >= prev.slot ? prev.rowH : 0;
+        if (event.clientY < rect.top - shifted + rect.height / 2) {
+          slot = Number(row.dataset.index);
+          break;
+        }
+      }
+      return { ...prev, dy, toGroupId: zoneId, slot, to: prev.from };
     });
   };
 
   const endDrag = () => {
-    if (drag && drag.to !== drag.from) move(drag.groupId, drag.from, drag.to);
+    if (drag) {
+      if (drag.toGroupId === drag.fromGroupId) {
+        if (drag.to !== drag.from) move(drag.fromGroupId, drag.from, drag.to);
+      } else {
+        relocate(drag.reactionId, drag.toGroupId, drag.slot);
+      }
+    }
     setDrag(null);
   };
 
   /** Siblings of the dragged row slide aside to mark the drop slot. */
-  const rowShift = (groupId: string, index: number): string | undefined => {
-    if (!drag || drag.groupId !== groupId || index === drag.from) return undefined;
-    const { from, to, rowH } = drag;
-    if (from < to && index > from && index <= to) return `translateY(${-rowH}px)`;
-    if (to < from && index >= to && index < from) return `translateY(${rowH}px)`;
-    return undefined;
+  const rowShift = (groupId: string, index: number): number => {
+    if (!drag) return 0;
+    const { fromGroupId, from, toGroupId, to, slot, rowH } = drag;
+    if (toGroupId === fromGroupId) {
+      if (groupId !== fromGroupId || index === from) return 0;
+      if (from < to && index > from && index <= to) return -rowH;
+      if (to < from && index >= to && index < from) return rowH;
+      return 0;
+    }
+    // Cross-group: close the gap left in the source, open the slot in the target.
+    if (groupId === fromGroupId) return index > from ? -rowH : 0;
+    if (groupId === toGroupId) return index >= slot ? rowH : 0;
+    return 0;
   };
 
   const readSound = async (file: File) => {
@@ -180,7 +232,7 @@ const ReactionManagerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) =>
         description="The default group and its reactions can't be changed; add your own groups below."
       />
 
-      <div className="overflow-y-auto">
+      <div className={`overflow-y-auto ${drag ? "select-none" : ""}`}>
         <div className="flex items-center gap-2 px-4 py-2 bg-muted/50">
           <span className="flex-1 text-sm font-semibold text-muted-foreground">Default</span>
           <Lock className="w-3.5 h-3.5 text-muted-foreground" aria-label="Locked" />
@@ -200,9 +252,8 @@ const ReactionManagerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) =>
 
         {groups.map((group) => {
           const items = customs.filter((r) => r.groupId === group.id);
-          const draggingHere = drag?.groupId === group.id;
           return (
-            <div key={group.id}>
+            <div key={group.id} data-drop-group={group.id}>
               <div className="flex items-center gap-1 px-4 py-2 bg-muted/50 border-t">
                 {renaming?.id === group.id ? (
                   <>
@@ -264,29 +315,28 @@ const ReactionManagerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) =>
               </div>
 
               {items.map((reaction, index) => {
-                const isDragged = drag !== null && drag.groupId === group.id && drag.from === index;
+                const isDragged =
+                  drag !== null && drag.fromGroupId === group.id && drag.from === index;
+                const shift = isDragged ? (drag?.dy ?? 0) : rowShift(group.id, index);
                 return (
                   <div
                     key={reaction.id}
                     data-reaction-row
+                    data-index={index}
                     className={`flex items-center gap-3 px-4 py-2.5 border-t ${
                       isDragged
                         ? "relative z-10 bg-card shadow-lg"
-                        : draggingHere
+                        : drag
                           ? "transition-transform"
                           : ""
                     }`}
-                    style={{
-                      transform: drag && isDragged
-                        ? `translateY(${drag.dy}px)`
-                        : rowShift(group.id, index),
-                    }}
+                    style={{ transform: shift ? `translateY(${shift}px)` : undefined }}
                   >
                     <button
                       type="button"
-                      aria-label={`Reorder ${reaction.name}`}
+                      aria-label={`Reorder or move ${reaction.name}`}
                       className="shrink-0 -ml-1 text-muted-foreground/50 cursor-grab active:cursor-grabbing touch-none"
-                      onPointerDown={(e) => startDrag(e, group.id, index, items.length)}
+                      onPointerDown={(e) => startDrag(e, reaction.id, group.id, index, items.length)}
                       onPointerMove={updateDrag}
                       onPointerUp={endDrag}
                       onPointerCancel={endDrag}

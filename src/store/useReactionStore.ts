@@ -95,6 +95,8 @@ interface ReactionStore {
   remove: (id: string) => void;
   /** Rearranges a reaction inside its own group. */
   move: (groupId: string, fromIndex: number, toIndex: number) => void;
+  /** Moves a reaction to another group, inserting it at the given slot. */
+  relocate: (id: string, groupId: string, slot: number) => void;
 }
 
 export const useReactionStore = create<ReactionStore>((set) => ({
@@ -147,6 +149,22 @@ export const useReactionStore = create<ReactionStore>((set) => ({
       // Order across groups is irrelevant (the UI filters per group), so the
       // sorted group can simply land at the back of the flat array.
       const customs = [...state.customs.filter((r) => r.groupId !== groupId), ...inGroup];
+      persist(state.groups, customs);
+      return { customs };
+    }),
+  relocate: (id, groupId, slot) =>
+    set((state) => {
+      const reaction = state.customs.find((r) => r.id === id);
+      if (!reaction || !state.groups.some((g) => g.id === groupId)) return {};
+      const target = state.customs.filter((r) => r.groupId === groupId && r.id !== id);
+      const to = Math.min(Math.max(slot, 0), target.length);
+      target.splice(to, 0, { ...reaction, groupId });
+      // Order across groups is irrelevant (the UI filters per group), so the
+      // target group can simply land at the back of the flat array.
+      const customs = [
+        ...state.customs.filter((r) => r.id !== id && r.groupId !== groupId),
+        ...target,
+      ];
       persist(state.groups, customs);
       return { customs };
     }),

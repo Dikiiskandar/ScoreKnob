@@ -4,9 +4,16 @@ import type { LucideIcon } from "lucide-react";
 
 export type DockItem = {
   id: string;
-  icon: LucideIcon;
+  /** Without an icon the button shows the label's first letter. */
+  icon?: LucideIcon;
   label: string;
   onSelect: () => void;
+};
+
+export type DockGroup = {
+  id: string;
+  name: string;
+  items: DockItem[];
 };
 
 const SIZE = 56;
@@ -39,20 +46,24 @@ const loadPlacement = (storageKey: string): Placement => {
  * edge, and tapping it reveals the actions.
  */
 const FloatingDock: React.FC<{
-  items: DockItem[];
+  groups: DockGroup[];
   icon: LucideIcon;
   label: string;
   storageKey: string;
   /** Shows a trailing "+" button in the open tray, e.g. to manage the items. */
   onManage?: () => void;
-}> = ({ items, icon: Icon, label, storageKey, onManage }) => {
+}> = ({ groups, icon: Icon, label, storageKey, onManage }) => {
   const [placement, setPlacement] = useState(() => loadPlacement(storageKey));
   const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight });
   /** Live pixel position while a drag is in progress. */
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
   const [open, setOpen] = useState(false);
+  const [tabId, setTabId] = useState<string | null>(null);
   const gesture = useRef<{ x: number; y: number; originX: number; originY: number; moved: boolean } | null>(null);
   const root = useRef<HTMLDivElement>(null);
+
+  // The selected tab may vanish when a group is deleted elsewhere.
+  const activeGroup = groups.find((group) => group.id === tabId) ?? groups[0];
 
   useEffect(() => {
     const onResize = () => setViewport({ width: window.innerWidth, height: window.innerHeight });
@@ -161,39 +172,70 @@ const FloatingDock: React.FC<{
         <Icon className="w-6 h-6 text-foreground" />
       </button>
 
-      {open && (
+      {open && activeGroup && (
         <div
-          className={`absolute top-0 flex items-center gap-2 rounded-full bg-card/90 border p-2 shadow-2xl backdrop-blur-md ${
+          className={`absolute top-0 w-max max-w-[calc(100vw-5.5rem)] flex flex-col gap-2 rounded-2xl bg-card/90 border p-2 shadow-2xl backdrop-blur-md ${
             placement.side === "left" ? "left-[calc(100%+0.5rem)]" : "right-[calc(100%+0.5rem)]"
           }`}
         >
-          {items.map(({ id, icon: ItemIcon, label: itemLabel, onSelect }) => (
-            <button
-              key={id}
-              onClick={() => {
-                onSelect();
-                setOpen(false);
-              }}
-              aria-label={itemLabel}
-              title={itemLabel}
-              className="w-10 h-10 flex-shrink-0 rounded-full bg-muted text-foreground hover:bg-accent active:scale-95 transition-all flex items-center justify-center"
-            >
-              <ItemIcon className="w-5 h-5" />
-            </button>
-          ))}
-          {onManage && (
-            <button
-              onClick={() => {
-                onManage();
-                setOpen(false);
-              }}
-              aria-label="Manage reactions"
-              title="Manage reactions"
-              className="w-10 h-10 flex-shrink-0 rounded-full border-2 border-dashed border-muted-foreground/50 text-muted-foreground hover:bg-accent active:scale-95 transition-all flex items-center justify-center"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
+          {groups.length > 1 && (
+            <div className="flex flex-wrap gap-1">
+              {groups.map((group) => (
+                <button
+                  key={group.id}
+                  onClick={() => setTabId(group.id)}
+                  aria-pressed={group.id === activeGroup.id}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    group.id === activeGroup.id
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-foreground hover:bg-accent"
+                  }`}
+                >
+                  {group.name}
+                </button>
+              ))}
+            </div>
           )}
+          <div className="flex flex-wrap items-center gap-2">
+            {activeGroup.items.map(({ id, icon: ItemIcon, label: itemLabel, onSelect }) => (
+              <button
+                key={id}
+                onClick={() => {
+                  onSelect();
+                  setOpen(false);
+                }}
+                aria-label={itemLabel}
+                title={itemLabel}
+                className="w-10 h-10 flex-shrink-0 rounded-full bg-muted text-foreground hover:bg-accent active:scale-95 transition-all flex items-center justify-center"
+              >
+                {ItemIcon ? (
+                  <ItemIcon className="w-5 h-5" />
+                ) : (
+                  <span className="text-sm font-semibold uppercase">
+                    {itemLabel.trim().slice(0, 2)}
+                  </span>
+                )}
+              </button>
+            ))}
+            {activeGroup.items.length === 0 && !onManage && (
+              <span className="px-2 py-2 text-xs text-muted-foreground whitespace-nowrap">
+                No reactions here yet
+              </span>
+            )}
+            {onManage && (
+              <button
+                onClick={() => {
+                  onManage();
+                  setOpen(false);
+                }}
+                aria-label="Manage reactions"
+                title="Manage reactions"
+                className="w-10 h-10 flex-shrink-0 rounded-full border-2 border-dashed border-muted-foreground/50 text-muted-foreground hover:bg-accent active:scale-95 transition-all flex items-center justify-center"
+              >
+                <Plus className="w-5 h-5" />
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

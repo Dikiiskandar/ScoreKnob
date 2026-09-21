@@ -154,7 +154,7 @@ const SidePanel: React.FC<{
 
 const Versus: React.FC = () => {
   const [state, setState] = useState<VersusState>(loadState);
-  const reactionItems = useReactionDock();
+  const reactionGroups = useReactionDock();
   const [showReactions, setShowReactions] = useState<boolean>(false);
   /** Undo stacks per round index, so switching rounds keeps each history intact. */
   const history = useRef<Record<number, Scores[]>>({});
@@ -314,7 +314,7 @@ const Versus: React.FC = () => {
       </div>
 
       <FloatingDock
-        items={reactionItems}
+        groups={reactionGroups}
         icon={Smile}
         label="Reactions"
         storageKey="scoreKnobReactionDock"

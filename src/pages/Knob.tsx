@@ -183,10 +183,16 @@ const ReactionSoundPicker: React.FC<{
           );
         })}
         {customs.map((reaction) => {
-          const Icon = REACTION_ICONS[reaction.icon] ?? REACTION_ICONS.music;
+          const Icon = reaction.icon ? REACTION_ICONS[reaction.icon] : undefined;
           return (
             <SheetRow key={reaction.id} onClick={() => onPick(reaction.sound)}>
-              <Icon className="w-5 h-5 text-primary" />
+              {Icon ? (
+                <Icon className="w-5 h-5 text-primary" />
+              ) : (
+                <span className="min-w-5 text-center text-sm font-semibold uppercase text-primary">
+                  {reaction.name.trim().slice(0, 2)}
+                </span>
+              )}
               <span className="flex-1 text-left">{reaction.name}</span>
               <IconButton
                 aria-label={`Play ${reaction.name}`}
@@ -372,7 +378,7 @@ const KnobScoreboard: React.FC = () => {
     };
   }, []);
 
-  const reactionItems = useReactionDock();
+  const reactionGroups = useReactionDock();
   const [showReactions, setShowReactions] = useState<boolean>(false);
   useEffect(preloadReactions, []);
 
@@ -1145,7 +1151,7 @@ const KnobScoreboard: React.FC = () => {
       />
 
       <FloatingDock
-        items={reactionItems}
+        groups={reactionGroups}
         icon={Smile}
         label="Reactions"
         storageKey="scoreKnobReactionDockKnob"

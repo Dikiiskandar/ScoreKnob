@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ALargeSmall, Check, Download, Languages, Minus, RotateCcw, Smile, Undo2, Volume2, VolumeX } from "lucide-react";
+import { ALargeSmall, ArrowLeftRight, Check, Download, Languages, Minus, RotateCcw, Smile, Undo2, Volume2, VolumeX } from "lucide-react";
 import FloatingDock from "@/components/FloatingDock";
 import IconButton from "@/components/IconButton";
 import IosInstallSheet from "@/components/IosInstallSheet";
@@ -216,6 +216,16 @@ const Versus: React.FC = () => {
   const addRound = () =>
     setState((prev) => ({ ...prev, rounds: [...prev.rounds, emptyScores()], currentRound: prev.rounds.length }));
 
+  /** Swap home/away everywhere so the left and right panels trade places. */
+  const swapSides = () => {
+    setState((prev) => ({
+      ...prev,
+      names: { home: prev.names.away, away: prev.names.home },
+      rounds: prev.rounds.map((round) => ({ home: round.away, away: round.home })),
+    }));
+    announce({ home: scores.away, away: scores.home });
+  };
+
   return (
     <div className="h-full flex flex-col">
       <div className="h-[calc(56px+var(--safe-top))] pt-safe flex items-center justify-between px-2 border-b bg-card">
@@ -283,6 +293,15 @@ const Versus: React.FC = () => {
             onRename={(name) => setState((prev) => ({ ...prev, names: { ...prev.names, [side]: name } }))}
           />
         ))}
+
+        <IconButton
+          round
+          onClick={swapSides}
+          aria-label="Swap home and away sides"
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 size-12 bg-card text-foreground border shadow-md hover:bg-accent"
+        >
+          <ArrowLeftRight className="w-5 h-5" />
+        </IconButton>
 
         <RoundSwitcher
           count={rounds.length}

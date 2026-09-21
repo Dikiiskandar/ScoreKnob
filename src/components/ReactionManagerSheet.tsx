@@ -4,7 +4,7 @@ import IconButton from "./IconButton";
 import MediaInput from "./MediaInput";
 import Modal, { SheetHeader, SheetSecondaryAction } from "./Modal";
 import { Input } from "@/components/ui/input";
-import { fileToDataUrl } from "@/lib/file";
+import { AUDIO_ACCEPT, fileToDataUrl } from "@/lib/file";
 import { REACTION_ICONS } from "@/lib/reactionIcons";
 import { REACTION_KINDS, REACTION_LABELS, playReaction, playSound } from "@/lib/reactions";
 import { MAX_REACTION_BYTES, useReactionStore } from "@/store/useReactionStore";
@@ -142,7 +142,7 @@ const ReactionManagerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) =>
             </div>
             <div className="flex gap-2">
               <MediaInput
-                accept="audio/*"
+                accept={AUDIO_ACCEPT}
                 onFile={(file) => void readSound(file)}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-muted hover:bg-accent transition-colors text-sm font-medium"
               >

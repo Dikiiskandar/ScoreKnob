@@ -6,7 +6,7 @@ import { useInstallAction } from "@/hooks/useInstallAction";
 import { useReactionDock } from "@/hooks/useReactionDock";
 import { useVoiceRecorder, canRecordVoice, recordUnavailableReason, MAX_VOICE_MS } from "@/hooks/useVoiceRecorder";
 import { fileToSquareDataUrl } from "@/lib/image";
-import { fileToDataUrl } from "@/lib/file";
+import { AUDIO_ACCEPT, fileToDataUrl } from "@/lib/file";
 import FloatingDock from "@/components/FloatingDock";
 import IconButton from "@/components/IconButton";
 import IosInstallSheet from "@/components/IosInstallSheet";
@@ -121,7 +121,7 @@ const VoiceSheet: React.FC<{
     )}
     {!isRecording && (
       <MediaInput
-        accept="audio/*"
+        accept={AUDIO_ACCEPT}
         onFile={onFile}
         className="flex items-center gap-3 px-4 py-3 border-t hover:bg-accent transition-colors"
       >

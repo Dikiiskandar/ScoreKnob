@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Check, GripVertical, Lock, Music, Pencil, Play, Plus, Trash2, X } from "lucide-react";
+import { Check, Download, GripVertical, Lock, Music, Pencil, Play, Plus, Trash2, Upload, X } from "lucide-react";
 import IconButton from "./IconButton";
 import MediaInput from "./MediaInput";
 import Modal, { SheetHeader, SheetSecondaryAction } from "./Modal";
 import { Input } from "@/components/ui/input";
-import { AUDIO_ACCEPT, fileToDataUrl } from "@/lib/file";
+import { AUDIO_ACCEPT, downloadTextFile, fileToDataUrl } from "@/lib/file";
+import { MAX_PRESET_BYTES, buildPreset, parsePreset } from "@/lib/reactionPresets";
 import { REACTION_ICONS } from "@/lib/reactionIcons";
 import { REACTION_KINDS, REACTION_LABELS, playReaction, playSound } from "@/lib/reactions";
 import { MAX_REACTION_BYTES, useReactionStore } from "@/store/useReactionStore";
@@ -59,8 +60,19 @@ const IconTile: React.FC<{ iconKey?: string; label: string }> = ({ iconKey, labe
  * order, and move them between groups.
  */
 const ReactionManagerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { customs, groups, add, update, remove, move, relocate, addGroup, renameGroup, removeGroup } =
-    useReactionStore();
+  const {
+    customs,
+    groups,
+    add,
+    update,
+    remove,
+    move,
+    relocate,
+    addGroup,
+    renameGroup,
+    removeGroup,
+    importPreset,
+  } = useReactionStore();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState("");
   /** Non-null while naming a brand new group in the footer. */
@@ -211,6 +223,34 @@ const ReactionManagerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) =>
     setRenaming(null);
   };
 
+  const exportPreset = () => {
+    downloadTextFile("scoreknob-reactions.json", buildPreset(groups, customs));
+  };
+
+  /** One group plus its reactions, named after the group. */
+  const exportGroup = (group: CustomGroup) => {
+    const slug =
+      group.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "group";
+    downloadTextFile(
+      `scoreknob-${slug}-reactions.json`,
+      buildPreset([group], customs.filter((r) => r.groupId === group.id)),
+    );
+  };
+
+  const importPresetFile = async (file: File) => {
+    if (file.size > MAX_PRESET_BYTES) {
+      setError(`That preset is too large (max ${Math.round(MAX_PRESET_BYTES / 1024 / 1024)} MB)`);
+      return;
+    }
+    try {
+      const preset = parsePreset(await file.text());
+      importPreset(preset.groups, preset.customs);
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not import that preset");
+    }
+  };
+
   const deleteGroup = (group: CustomGroup, count: number) => {
     if (
       count > 0 &&
@@ -301,6 +341,13 @@ const ReactionManagerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                       onClick={() => setRenaming({ id: group.id, name: group.name })}
                     >
                       <Pencil className="w-4 h-4" />
+                    </IconButton>
+                    <IconButton
+                      aria-label={`Export ${group.name}`}
+                      className="size-8"
+                      onClick={() => exportGroup(group)}
+                    >
+                      <Download className="w-4 h-4" />
                     </IconButton>
                     <IconButton
                       danger
@@ -504,14 +551,36 @@ const ReactionManagerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) =>
             </div>
           </>
         ) : (
-          <button
-            type="button"
-            onClick={() => setNewGroupName("")}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Add group
-          </button>
+          <>
+            <div className="flex gap-2">
+              <MediaInput
+                accept="application/json,.json"
+                onFile={(file) => void importPresetFile(file)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-muted hover:bg-accent transition-colors text-sm font-medium"
+              >
+                <Upload className="w-4 h-4" />
+                Import preset
+              </MediaInput>
+              <button
+                type="button"
+                onClick={exportPreset}
+                disabled={groups.length === 0}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-muted hover:bg-accent transition-colors text-sm font-medium disabled:opacity-50 disabled:pointer-events-none"
+              >
+                <Download className="w-4 h-4" />
+                Export preset
+              </button>
+            </div>
+            {error && <div className="text-xs text-destructive">{error}</div>}
+            <button
+              type="button"
+              onClick={() => { setNewGroupName(""); setError(""); }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add group
+            </button>
+          </>
         )}
       </div>
     </Modal>

@@ -97,6 +97,8 @@ interface ReactionStore {
   move: (groupId: string, fromIndex: number, toIndex: number) => void;
   /** Moves a reaction to another group, inserting it at the given slot. */
   relocate: (id: string, groupId: string, slot: number) => void;
+  /** Appends an imported preset under fresh ids, keeping what the user already has. */
+  importPreset: (groups: CustomGroup[], customs: CustomReaction[]) => void;
 }
 
 export const useReactionStore = create<ReactionStore>((set) => ({
@@ -167,5 +169,23 @@ export const useReactionStore = create<ReactionStore>((set) => ({
       ];
       persist(state.groups, customs);
       return { customs };
+    }),
+  importPreset: (presetGroups, presetCustoms) =>
+    set((state) => {
+      if (presetGroups.length === 0) return {};
+      // Fresh ids avoid clashing with reactions already on this device.
+      const idMap = new Map(presetGroups.map((g) => [g.id, newId()]));
+      const groups = [
+        ...state.groups,
+        ...presetGroups.map((g) => ({ id: idMap.get(g.id)!, name: g.name })),
+      ];
+      const customs = [
+        ...state.customs,
+        ...presetCustoms
+          .filter((r) => idMap.has(r.groupId))
+          .map((r) => ({ ...r, id: newId(), groupId: idMap.get(r.groupId)! })),
+      ];
+      persist(groups, customs);
+      return { groups, customs };
     }),
 }));

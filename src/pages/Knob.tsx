@@ -98,11 +98,11 @@ const VoiceSheet: React.FC<{
       description={`Plays automatically when this player is highlighted after a submit (max ${MAX_VOICE_MS / 1000}s).`}
     />
     {isRecording ? (
-      <SheetRow onClick={onStop} className="bg-red-600/10 text-red-600 hover:bg-red-600/20">
+      <SheetRow onClick={onStop} className="bg-destructive/10 text-destructive hover:bg-destructive/20">
         <Square className="w-5 h-5" />
         <span className="flex-1 text-left">Stop recording</span>
         <span className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+          <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
           <span className="font-mono text-sm tabular-nums">
             {(elapsedMs / 1000).toFixed(1)}s / {MAX_VOICE_MS / 1000}s
           </span>
@@ -230,8 +230,8 @@ const HIGHLIGHTS: HighlightConfig[] = [
     id: "first",
     label: "First rank",
     icon: Crown,
-    card: "bg-yellow-500/50 border-yellow-500/80",
-    accent: "text-yellow-600",
+    card: "bg-yellow-500/50 border-yellow-500/80 dark:bg-yellow-500/25 dark:border-yellow-400/60",
+    accent: "text-yellow-600 dark:text-yellow-400",
     value: (p) => p.score,
     display: (p) => String(p.score),
   },
@@ -239,8 +239,8 @@ const HIGHLIGHTS: HighlightConfig[] = [
     id: "last",
     label: "Last rank",
     icon: ArrowDown,
-    card: "bg-red-500/50 border-red-500/80",
-    accent: "text-red-600",
+    card: "bg-red-500/50 border-red-500/80 dark:bg-red-500/25 dark:border-red-400/60",
+    accent: "text-destructive",
     value: (p) => -p.score,
     display: (p) => String(p.score),
   },
@@ -248,8 +248,8 @@ const HIGHLIGHTS: HighlightConfig[] = [
     id: "gain",
     label: "Biggest gain",
     icon: TrendingUp,
-    card: "bg-green-500/50 border-green-500/80",
-    accent: "text-green-600",
+    card: "bg-green-500/50 border-green-500/80 dark:bg-green-500/25 dark:border-green-400/60",
+    accent: "text-success",
     value: (p) => p.score - p.previousScore,
     display: (p) => `+${p.score - p.previousScore}`,
   },
@@ -257,8 +257,8 @@ const HIGHLIGHTS: HighlightConfig[] = [
     id: "drop",
     label: "Biggest drop",
     icon: TrendingDown,
-    card: "bg-orange-500/50 border-orange-500/80",
-    accent: "text-orange-600",
+    card: "bg-orange-500/50 border-orange-500/80 dark:bg-orange-500/25 dark:border-orange-400/60",
+    accent: "text-orange-600 dark:text-orange-400",
     value: (p) => p.previousScore - p.score,
     display: (p) => String(p.score - p.previousScore),
   },
@@ -623,9 +623,9 @@ const KnobScoreboard: React.FC = () => {
   const highlightBadges = getHighlightBadges(players);
 
   const getRankIcon = (rank: number) => {
-    if (rank === 0) return <Trophy className="w-5 h-5 text-yellow-500" />;
+    if (rank === 0) return <Trophy className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />;
     if (rank === 1) return <Medal className="w-5 h-5 text-gray-400" />;
-    if (rank === 2) return <Medal className="w-5 h-5 text-amber-700" />;
+    if (rank === 2) return <Medal className="w-5 h-5 text-amber-700 dark:text-amber-400" />;
     return <span className="w-5 h-5 flex items-center justify-center font-bold text-muted-foreground">#{rank + 1}</span>;
   };
 
@@ -641,7 +641,7 @@ const KnobScoreboard: React.FC = () => {
             </Link>
           )}
           {isOffline && (
-            <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 text-xs font-semibold" title="You are offline. Scores are saved on this device.">
+            <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-semibold" title="You are offline. Scores are saved on this device.">
               <WifiOff className="w-3 h-3" />
               Offline
             </span>
@@ -656,7 +656,7 @@ const KnobScoreboard: React.FC = () => {
               <div className="flex items-center gap-2 font-semibold text-xl">
                 <span>{activePlayer.score}</span>
                 <span className="text-sm opacity-75">{change >= 0 ? '+' : '-'}</span>
-                <span className={change >= 0 ? 'text-green-300' : 'text-red-300'}>{Math.abs(change)}</span>
+                <span className={change >= 0 ? 'text-success' : 'text-destructive'}>{Math.abs(change)}</span>
                 <span className="text-sm opacity-75">=</span>
                 <span>{activePlayer.pendingScore}</span>
               </div>
@@ -807,7 +807,7 @@ const KnobScoreboard: React.FC = () => {
                       </span>
                     ))}
                     {hasRanking && rankChange !== 0 && (
-                      <span className={`text-[10px] ${rankChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      <span className={`text-[10px] ${rankChange > 0 ? 'text-success' : 'text-destructive'}`}>
                         {rankChange > 0 ? '↑' : '↓'}{Math.abs(rankChange)}
                       </span>
                     )}
@@ -921,7 +921,7 @@ const KnobScoreboard: React.FC = () => {
                 </button>
               </div>
               {(photoError || voiceError || voiceFileError) && (
-                <div className="mt-2 text-xs text-red-600">{photoError || voiceError || voiceFileError}</div>
+                <div className="mt-2 text-xs text-destructive">{photoError || voiceError || voiceFileError}</div>
               )}
             </div>
 
@@ -945,7 +945,7 @@ const KnobScoreboard: React.FC = () => {
                       <IconButton
                         onClick={savePlayerName}
                         aria-label="Save player name"
-                        className="size-9 text-green-600 hover:bg-green-600/10"
+                        className="size-9 text-success hover:bg-success/10"
                       >
                         <RotateCw className="w-4 h-4" />
                       </IconButton>
@@ -979,8 +979,8 @@ const KnobScoreboard: React.FC = () => {
                         <div className="font-semibold truncate flex items-center gap-1">
                           {player.name}
                           {recordingFor === player.id ? (
-                            <span className="flex items-center gap-1 text-xs font-bold text-red-600 flex-shrink-0">
-                              <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+                            <span className="flex items-center gap-1 text-xs font-bold text-destructive flex-shrink-0">
+                              <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
                               REC
                             </span>
                           ) : playingFor === player.id ? (
@@ -998,7 +998,7 @@ const KnobScoreboard: React.FC = () => {
                         danger={recordingFor === player.id}
                         className={
                           recordingFor === player.id
-                            ? "size-9 bg-red-600/10 animate-pulse"
+                            ? "size-9 bg-destructive/10 animate-pulse"
                             : player.voice
                               ? "size-9 text-primary hover:bg-primary/10"
                               : "size-9"
@@ -1054,7 +1054,7 @@ const KnobScoreboard: React.FC = () => {
         <Modal className="max-h-[80vh] flex flex-col">
             <div className="p-6 border-b">
               <h2 className="text-xl font-bold flex items-center gap-2">
-                <Trophy className="w-6 h-6 text-yellow-500" />
+                <Trophy className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
                 Leaderboard
               </h2>
             </div>
@@ -1072,7 +1072,7 @@ const KnobScoreboard: React.FC = () => {
                   className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
                     index === 0 ? 'bg-yellow-500/10 border border-yellow-500/30' :
                     index === 1 ? 'bg-gray-400/10 border border-gray-400/30' :
-                    index === 2 ? 'bg-amber-700/10 border border-amber-700/30' :
+                    index === 2 ? 'bg-amber-500/15 border border-amber-600/40 dark:border-amber-400/50' :
                     'bg-muted'
                   }`}
                 >
@@ -1089,7 +1089,7 @@ const KnobScoreboard: React.FC = () => {
                         </span>
                       ))}
                       {hasRanking && rankChange !== 0 && (
-                        <span className={`font-bold ${rankChange > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <span className={`font-bold ${rankChange > 0 ? 'text-success' : 'text-destructive'}`}>
                           {rankChange > 0 ? '↑' : '↓'}{Math.abs(rankChange)}
                         </span>
                       )}
@@ -1100,7 +1100,7 @@ const KnobScoreboard: React.FC = () => {
                     <div className="text-2xl font-bold text-primary leading-none">{player.score}</div>
                     {player.score !== player.previousScore && (
                       <div className={`text-xs font-semibold mt-0.5 ${
-                        player.score > player.previousScore ? 'text-green-600' : 'text-red-600'
+                        player.score > player.previousScore ? 'text-success' : 'text-destructive'
                       }`}>
                         {player.score > player.previousScore ? '+' : ''}{player.score - player.previousScore}
                       </div>

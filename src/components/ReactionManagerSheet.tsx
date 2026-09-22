@@ -461,7 +461,7 @@ const ReactionManagerSheet: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                 </IconButton>
               )}
             </div>
-            {error && <div className="text-xs text-red-600">{error}</div>}
+            {error && <div className="text-xs text-destructive">{error}</div>}
             <div className="flex gap-2">
               <SheetSecondaryAction onClick={() => { setDraft(null); setError(""); }} className="flex-1">
                 Cancel

@@ -55,7 +55,7 @@ export const SheetRow: React.FC<
     className={cn(
       "w-full flex items-center gap-3 px-4 py-3 border-t transition-colors",
       danger
-        ? "text-red-600 hover:bg-red-600/10"
+        ? "text-destructive hover:bg-destructive/10"
         : active
           ? "bg-primary/10 text-primary hover:bg-primary/20"
           : "hover:bg-accent",
